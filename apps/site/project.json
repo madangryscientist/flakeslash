@@ -1,0 +1,31 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "site",
+  "sourceRoot": "apps/site/src",
+  "projectType": "application",
+  "targets": {
+    "typecheck": {
+      "command": "tsr generate && tsc --noEmit",
+      "options": { "cwd": "apps/site" }
+    },
+    "lint": {
+      "command": "oxlint --type-aware --deny-warnings apps/site && bun scripts/check-slop.ts apps/site"
+    },
+    "test": {
+      "command": "bun --bun vitest run",
+      "options": { "cwd": "apps/site" }
+    },
+    "build": {
+      "command": "vite build",
+      "options": { "cwd": "apps/site" },
+      "cache": true,
+      "inputs": ["default", "^default"],
+      "outputs": ["{projectRoot}/dist"]
+    },
+    "test:e2e": {
+      "command": "playwright test",
+      "options": { "cwd": "apps/site" },
+      "dependsOn": ["build"]
+    }
+  }
+}

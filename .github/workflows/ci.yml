@@ -1,0 +1,96 @@
+name: CI
+
+# The gate from AGENTS.md, on a GitHub-hosted runner. No secrets are read, and the trigger is
+# `pull_request` (never `pull_request_target`). Actions are pinned to a commit; the tag is in the
+# comment.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The Bun the repo is built and pinned against (.tool-versions).
+  BUN_VERSION: "1.4.2"
+
+jobs:
+  gate:
+    name: Gate (typecheck, lint, format, test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun run lint
+      - run: bun run format:check
+      - run: bun run test
+
+  changes:
+    name: Did an app change?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      apps: ${{ steps.diff.outputs.apps }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "apps=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The apps and packages (what they import), plus what decides how they install and run.
+          if git diff --name-only "origin/$BASE_REF...HEAD" \
+            | grep -qE '^(apps/|packages/|bun\.lock$|bunfig\.toml$|\.github/workflows/ci\.yml$)'; then
+            echo "apps=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "apps=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  apps:
+    name: Apps gate (build, e2e, deploy dry run)
+    needs: changes
+    if: needs.changes.outputs.apps == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      - name: Install the Playwright browser
+        working-directory: apps/web
+        run: bunx playwright install --with-deps chromium-headless-shell
+      - run: bunx nx test:e2e web
+      - run: bunx nx build web
+      - name: Web deploy dry run
+        working-directory: apps/web
+        run: bunx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/fl-web-dry"
+      - run: bunx nx build site
+      - run: bunx nx test:e2e site
+      - name: Site deploy dry run
+        working-directory: apps/site
+        run: bunx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/fl-site-dry"

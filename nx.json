@@ -1,0 +1,32 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "analytics": false,
+  "useDaemonProcess": false,
+  "namedInputs": {
+    "default": ["{projectRoot}/**/*", "sharedGlobals"],
+    "sharedGlobals": [
+      "{workspaceRoot}/tsconfig.base.json",
+      "{workspaceRoot}/.oxlintrc.json",
+      "{workspaceRoot}/scripts/check-slop.ts",
+      "{workspaceRoot}/nx.json",
+      "{workspaceRoot}/.tool-versions"
+    ]
+  },
+  "targetDefaults": {
+    "typecheck": {
+      "cache": true,
+      "inputs": ["default", "^default"]
+    },
+    "lint": {
+      "cache": true,
+      "inputs": ["default", "^default"]
+    },
+    "test": {
+      "cache": true,
+      "inputs": ["default", "^default"]
+    }
+  },
+  "affected": {
+    "legacy": true
+  }
+}

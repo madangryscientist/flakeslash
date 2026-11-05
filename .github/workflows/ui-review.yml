@@ -1,0 +1,45 @@
+name: UI review
+
+# Checks that the app's UI is built the Hack Cove way. The rules and the model review live in
+# madangryscientist/hackcove; this file only names the app code to review. Layer 1 fails the
+# pull request with file:line annotations; layer 2 is advisory and never fails it.
+#
+# The workflow file itself is in the trigger so a change to this file runs the check once; it is
+# not in `paths` below, so the rules never read it.
+
+on:
+  pull_request:
+    paths:
+      - "apps/web/src/**/*.tsx"
+      - "apps/web/src/**/*.css"
+      - "!**/*.test.tsx"
+      - "!**/*.spec.tsx"
+      - "!**/e2e/**"
+      - "!**/routeTree.gen.ts"
+      - "!**/worker-configuration.d.ts"
+      - ".github/workflows/ui-review.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ui-review:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: madangryscientist/hackcove/.github/workflows/ui-review.yml@main
+    with:
+      paths: |
+        apps/web/src/**/*.tsx
+        apps/web/src/**/*.css
+        !**/*.test.tsx
+        !**/*.spec.tsx
+        !**/e2e/**
+        !**/routeTree.gen.ts
+        !**/worker-configuration.d.ts
+    secrets:
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}

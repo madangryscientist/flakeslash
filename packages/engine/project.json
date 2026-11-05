@@ -1,0 +1,16 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "engine",
+  "sourceRoot": "packages/engine/src",
+  "projectType": "library",
+  "targets": {
+    "typecheck": { "command": "tsc -p packages/engine/tsconfig.json" },
+    "lint": {
+      "command": "oxlint --type-aware --deny-warnings packages/engine && bun scripts/check-slop.ts packages/engine"
+    },
+    "test": {
+      "command": "bun --bun vitest run",
+      "options": { "cwd": "packages/engine" }
+    }
+  }
+}

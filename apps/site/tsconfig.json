@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", "dist", ".wrangler", "test-results", "playwright-report"],
+  "compilerOptions": {
+    "target": "ES2023",
+    "jsx": "react-jsx",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["bun", "node", "vite/client"],
+    "resolveJsonModule": true,
+    "paths": { "#/*": ["./src/*"] }
+  }
+}

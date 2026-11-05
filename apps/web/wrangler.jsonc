@@ -1,0 +1,34 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "flakeslash-web",
+  "compatibility_date": "2025-09-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "src/server.ts",
+  "observability": { "enabled": true },
+  "upload_source_maps": true,
+  // The id is a placeholder: creating the real D1 database is the first deploy's job (a human
+  // step), not this scaffold's. Local dev and tests use local state. There is no route and no
+  // custom domain either: no domain is chosen yet, and attaching one is part of that first
+  // deploy.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "flakeslash",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "drizzle",
+    },
+  ],
+  // `CLOUDFLARE_ENV=e2e`: the Playwright build. Bindings are not inherited by an env, so they repeat here.
+  "env": {
+    "e2e": {
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "flakeslash",
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "drizzle",
+        },
+      ],
+    },
+  },
+}

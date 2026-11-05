@@ -1,0 +1,13 @@
+node_modules/
+.nx/
+
+# the flakeslash package's build output
+packages/cli/dist/
+packages/cli/LICENSE
+packages/cli/NOTICE
+packages/cli/*.tgz
+
+# secrets
+*.pem
+.env
+.dev.vars

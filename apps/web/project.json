@@ -1,0 +1,27 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "web",
+  "sourceRoot": "apps/web/src",
+  "projectType": "application",
+  "targets": {
+    "typecheck": {
+      "command": "tsr generate && tsc --noEmit",
+      "options": { "cwd": "apps/web" }
+    },
+    "lint": {
+      "command": "oxlint --type-aware --deny-warnings apps/web && bun scripts/check-slop.ts apps/web"
+    },
+    "test": {
+      "command": "bun --bun vitest run",
+      "options": { "cwd": "apps/web" }
+    },
+    "build": {
+      "command": "vite build",
+      "options": { "cwd": "apps/web" },
+      "cache": true,
+      "inputs": ["default", "^default"],
+      "outputs": ["{projectRoot}/dist"]
+    },
+    "test:e2e": { "command": "playwright test", "options": { "cwd": "apps/web" } }
+  }
+}

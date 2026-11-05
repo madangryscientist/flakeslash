@@ -1,0 +1,36 @@
+{
+  "name": "@hackcove/flakeslash",
+  "version": "0.0.0",
+  "description": "The FlakeSlash command line: flaky-test detection from the terminal.",
+  "keywords": [
+    "cli",
+    "flaky-tests",
+    "test-reliability"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/madangryscientist/flakeslash.git",
+    "directory": "packages/cli"
+  },
+  "bin": {
+    "flakeslash": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@hackcove/flakeslash-engine": "workspace:*",
+    "@types/bun": "1.4.4",
+    "vitest": "5.1.0"
+  },
+  "engines": {
+    "bun": ">=1.4.0"
+  }
+}

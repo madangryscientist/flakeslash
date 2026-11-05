@@ -1,0 +1,10 @@
+@import "tailwindcss";
+@import "@hackcove/theme-catppuccin-mocha/theme.css";
+/* Tailwind skips node_modules: scan the design system for the utilities its components use. */
+@source "../node_modules/@hackcove/ui-react/dist";
+
+/*
+ * Catppuccin Mocha palette © 2021 Catppuccin, MIT license (notice in
+ * @hackcove/theme-catppuccin-mocha/NOTICE). Tailwind's build drops the credit comment from the
+ * theme file, so it is repeated here.
+ */

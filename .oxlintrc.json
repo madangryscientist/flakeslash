@@ -1,0 +1,94 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "import", "react", "vitest"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
+  "rules": {
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/consistent-type-assertions": [
+      "error",
+      {
+        "assertionStyle": "never"
+      }
+    ],
+    "typescript/ban-ts-comment": [
+      "error",
+      {
+        "ts-ignore": true,
+        "ts-nocheck": true,
+        "ts-expect-error": "allow-with-description"
+      }
+    ],
+    "no-empty": [
+      "error",
+      {
+        "allowEmptyCatch": false
+      }
+    ],
+    "no-console": [
+      "error",
+      {
+        "allow": []
+      }
+    ],
+    "no-unused-vars": "error",
+    "no-nested-ternary": "error",
+    "complexity": [
+      "error",
+      {
+        "max": 10
+      }
+    ],
+    "max-depth": [
+      "error",
+      {
+        "max": 3
+      }
+    ],
+    "max-params": [
+      "error",
+      {
+        "max": 4
+      }
+    ],
+    "max-lines": [
+      "error",
+      {
+        "max": 300,
+        "skipBlankLines": true,
+        "skipComments": true
+      }
+    ],
+    "max-lines-per-function": [
+      "error",
+      {
+        "max": 80,
+        "skipBlankLines": true,
+        "skipComments": true
+      }
+    ],
+    "react/react-in-jsx-scope": "off"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "**/test/**", "e2e/**", "smoke/**"],
+      "rules": {
+        "typescript/consistent-type-assertions": "off",
+        "typescript/no-non-null-assertion": "off",
+        "max-lines-per-function": "off"
+      }
+    },
+    {
+      "files": ["scripts/**"],
+      "rules": {
+        "no-console": "off"
+      }
+    }
+  ],
+  "ignorePatterns": ["src/routeTree.gen.ts", "worker-configuration.d.ts", "drizzle/**"]
+}
