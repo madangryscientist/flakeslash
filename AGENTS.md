@@ -5,7 +5,8 @@ from a CLI and a hosted dashboard. No product domain is chosen yet, so nothing i
 
 **This repository is a skeleton.** It has the structure, the gate and the CI, and no product
 features. The engine exports a name and a version; the dashboard and the site each render one page.
-Flake detection, CI readers, storage and the API arrive as their own tickets.
+Flake detection, CI readers, storage and the API arrive as their own tickets, and
+[`docs/product.md`](docs/product.md) is the design they build to.
 
 This file is the operating agreement for contributors and agents working here: the gate, the landing
 rule and the invariants. Keep it accurate.
