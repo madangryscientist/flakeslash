@@ -1,6 +1,6 @@
 # Getting started
 
-FlakeSlash is a skeleton: there is nothing to detect yet. What you can do today:
+FlakeSlash is a skeleton: there is nothing to detect yet ([the design](product.md) says what is coming). What you can do today:
 
 ```bash
 bun install
