@@ -12,6 +12,8 @@ export function describeEngine(): string {
   return `${ENGINE_NAME} ${ENGINE_VERSION}`;
 }
 
+export type { HeldAttempt, Store } from "./store.ts";
+
 export {
   readGitHubActions,
   type FetchLike,
