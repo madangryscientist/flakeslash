@@ -1,0 +1,15 @@
+[
+  {
+    "number": 84,
+    "state": "closed",
+    "title": "chore(release): @hackcove/pixelslash 0.6.0",
+    "html_url": "https://github.com/madangryscientist/pixelslash/pull/84",
+    "head": {
+      "ref": "release/0.6.0",
+      "sha": "865de4094426ac13811eb7cb2db5d7ccef9ed274"
+    },
+    "base": {
+      "ref": "main"
+    }
+  }
+]

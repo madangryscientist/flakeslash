@@ -1,0 +1,253 @@
+{
+  "total_count": 4,
+  "jobs": [
+    {
+      "id": 126057955448,
+      "run_id": 41676366416,
+      "run_attempt": 1,
+      "name": "Gate (typecheck, lint, format, test)",
+      "workflow_name": "CI",
+      "head_sha": "865de4094426ac13811eb7cb2db5d7ccef9ed274",
+      "head_branch": "release/0.6.0",
+      "conclusion": "failure",
+      "started_at": "2026-11-03T16:39:07Z",
+      "completed_at": "2026-11-03T16:42:31Z",
+      "runner_name": "GitHub Actions 1000001064",
+      "labels": ["ubuntu-latest"],
+      "html_url": "https://github.com/madangryscientist/pixelslash/actions/runs/41676366416/job/126057955448",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run bun install --frozen-lockfile",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install the Playwright browser",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run bun run typecheck",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run bun run lint",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run bun run format:check",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run bun run test",
+          "conclusion": "failure"
+        },
+        {
+          "name": "Post Run actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Post Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 126057956029,
+      "run_id": 41676366416,
+      "run_attempt": 1,
+      "name": "Playwright example on Node (packed tarballs)",
+      "workflow_name": "CI",
+      "head_sha": "865de4094426ac13811eb7cb2db5d7ccef9ed274",
+      "head_branch": "release/0.6.0",
+      "conclusion": "success",
+      "started_at": "2026-11-03T16:39:07Z",
+      "completed_at": "2026-11-03T16:41:37Z",
+      "runner_name": "GitHub Actions 1000001065",
+      "labels": ["ubuntu-latest"],
+      "html_url": "https://github.com/madangryscientist/pixelslash/actions/runs/41676366416/job/126057956029",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run bun install --frozen-lockfile",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install the browser's system libraries",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run bun run check:example",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 126057956281,
+      "run_id": 41676366416,
+      "run_attempt": 1,
+      "name": "Did the web app change?",
+      "workflow_name": "CI",
+      "head_sha": "865de4094426ac13811eb7cb2db5d7ccef9ed274",
+      "head_branch": "release/0.6.0",
+      "conclusion": "success",
+      "started_at": "2026-11-03T16:39:07Z",
+      "completed_at": "2026-11-03T16:39:16Z",
+      "runner_name": "GitHub Actions 1000001066",
+      "labels": ["ubuntu-latest"],
+      "html_url": "https://github.com/madangryscientist/pixelslash/actions/runs/41676366416/job/126057956281",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run if [ \"$EVENT\" != \"pull_request\" ]; then",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 126058067053,
+      "run_id": 41676366416,
+      "run_attempt": 1,
+      "name": "Web gate (build, e2e, deploy dry run)",
+      "workflow_name": "CI",
+      "head_sha": "865de4094426ac13811eb7cb2db5d7ccef9ed274",
+      "head_branch": "release/0.6.0",
+      "conclusion": "failure",
+      "started_at": "2026-11-03T16:39:18Z",
+      "completed_at": "2026-11-03T16:47:44Z",
+      "runner_name": "GitHub Actions 1000001067",
+      "labels": ["ubuntu-latest"],
+      "html_url": "https://github.com/madangryscientist/pixelslash/actions/runs/41676366416/job/126058067053",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run bun install --frozen-lockfile",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install the Playwright browser",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run bunx nx build web",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run bunx nx test:e2e web",
+          "conclusion": "success"
+        },
+        {
+          "name": "e2e against vite dev",
+          "conclusion": "failure"
+        },
+        {
+          "name": "Deploy dry run",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Deploy dry run, env.production (app.pixelslash.dev)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Post Run actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Post Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ]
+}
