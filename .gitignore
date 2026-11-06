@@ -11,3 +11,6 @@ packages/cli/*.tgz
 *.pem
 .env
 .dev.vars
+
+# the local FlakeSlash store (the CLI default path)
+.flakeslash/
