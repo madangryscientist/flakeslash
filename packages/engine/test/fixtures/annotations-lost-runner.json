@@ -1,0 +1,26 @@
+[
+  {
+    "path": ".github",
+    "start_line": 12,
+    "end_line": 12,
+    "start_column": null,
+    "end_column": null,
+    "annotation_level": "failure",
+    "title": "",
+    "message": "The runner has received a shutdown signal. This can happen when the runner service is stopped, or a manually started runner is canceled.",
+    "raw_details": "",
+    "blob_href": "https://github.com/madangryscientist/pixelslash/blob/0123456789abcdef0123456789abcdef01234567/.github"
+  },
+  {
+    "path": ".github",
+    "start_line": 12,
+    "end_line": 12,
+    "start_column": null,
+    "end_column": null,
+    "annotation_level": "failure",
+    "title": "",
+    "message": "The operation was canceled.",
+    "raw_details": "",
+    "blob_href": "https://github.com/madangryscientist/pixelslash/blob/0123456789abcdef0123456789abcdef01234567/.github"
+  }
+]

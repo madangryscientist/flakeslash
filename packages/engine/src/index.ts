@@ -11,3 +11,12 @@ export const ENGINE_VERSION = "0.0.0";
 export function describeEngine(): string {
   return `${ENGINE_NAME} ${ENGINE_VERSION}`;
 }
+
+export {
+  readGitHubActions,
+  type FetchLike,
+  type JobRecord,
+  type ReadGitHubActionsOptions,
+  type ReadGitHubActionsResult,
+  type Runner,
+} from "./providers/github-actions.ts";
