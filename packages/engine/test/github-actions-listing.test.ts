@@ -188,3 +188,38 @@ describe("readGitHubActions: limits and failures", () => {
     expect(gh.calls).toEqual([]);
   });
 });
+
+describe("readGitHubActions: held attempts and run status", () => {
+  it("rejects a run listed without a status", async () => {
+    const { status: _status, ...noStatus } = run(71, "2026-11-05T00:00:00Z");
+    const gh = fakeGitHub({ [RUNS]: runsOf(noStatus) });
+    await expect(readGitHubActions({ repo: REPO, since, fetch: gh.fetch })).rejects.toThrow(
+      "without an id, head_sha, created_at or status",
+    );
+  });
+
+  it("hands each run's records to onRecords as the run is read, and skips held attempts", async () => {
+    const gh = fakeGitHub({
+      [RUNS]: runsOf(run(81, "2026-11-05T00:00:00Z"), run(82, "2026-11-04T00:00:00Z")),
+      [pullsPath("82".padStart(40, "a"))]: json([]),
+      [jobsPath(82, 1)]: jobsOf(job(821, 82)),
+    });
+    const batches: number[][] = [];
+    const { records } = await readGitHubActions({
+      repo: REPO,
+      since,
+      fetch: gh.fetch,
+      held: [{ runId: 81, runAttempt: 1 }],
+      onRecords: async (batch) => {
+        batches.push(batch.map((r) => r.jobId));
+      },
+    });
+    expect(batches).toEqual([[821]]);
+    expect(records.map((r) => r.jobId)).toEqual([821]);
+    expect(gh.calls.map((url) => url.replace(API, ""))).toEqual([
+      RUNS,
+      pullsPath("82".padStart(40, "a")),
+      jobsPath(82, 1),
+    ]);
+  });
+});

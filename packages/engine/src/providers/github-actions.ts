@@ -16,6 +16,7 @@ import {
   type JobAnnotation,
   type JobStep,
 } from "./github-parse.ts";
+import type { HeldAttempt } from "../store.ts";
 import type { Runner } from "./github-runner.ts";
 
 export type { FetchLike } from "./github-api.ts";
@@ -54,6 +55,14 @@ export interface ReadGitHubActionsOptions {
   fetch: FetchLike;
   /** Optional: public repos read without one, at a lower rate limit. */
   token?: string;
+  /** Attempts already held. They are not fetched again. */
+  held?: readonly HeldAttempt[];
+  /**
+   * Awaited after each run with the records read for that run, when there are any, so a read that
+   * later fails has still handed over everything before the failure. `records` in the result still
+   * holds all of them.
+   */
+  onRecords?: (records: JobRecord[]) => Promise<void>;
 }
 
 export interface ReadGitHubActionsResult {
@@ -67,10 +76,18 @@ interface Ctx {
   repo: string;
   /** commit sha to its pull request number (null: none). One lookup per commit per read. */
   pulls: Map<string, number | null>;
+  /** run id to the attempts of it already held. */
+  held: Map<number, Set<number>>;
   records: JobRecord[];
+  onRecords: (records: JobRecord[]) => Promise<void>;
 }
 
 const REPO = /^[\w.-]+\/[\w.-]+$/;
+
+/** Whether `repo` is shaped `owner/name`. */
+export function isRepoName(repo: string): boolean {
+  return REPO.test(repo);
+}
 
 function parseSince(since: string): number {
   const ms = Date.parse(since);
@@ -175,22 +192,61 @@ async function readAttempt(
   return records;
 }
 
-/** Every attempt of a run, oldest first. Returns "cut" when a rate limit ended it. */
+/**
+ * The attempts of a run still to fetch, oldest first. A held attempt is skipped. The latest attempt of
+ * a run that is not `completed` is skipped too: it may still gain jobs (one with a `needs` may not be
+ * listed until what it needs has ended), so what it shows now is not all of it.
+ */
+function attemptsToRead(ctx: Ctx, run: ApiRun): number[] {
+  const held = ctx.held.get(run.id);
+  const attempts: number[] = [];
+  for (let attempt = 1; attempt <= run.runAttempt; attempt += 1) {
+    if (held?.has(attempt)) continue;
+    if (attempt === run.runAttempt && run.status !== "completed") continue;
+    attempts.push(attempt);
+  }
+  return attempts;
+}
+
+/** Every attempt of a run still to read, oldest first. Returns "cut" when a rate limit ended it. */
 async function readRun(ctx: Ctx, run: ApiRun): Promise<"done" | "cut"> {
+  const attempts = attemptsToRead(ctx, run);
+  if (attempts.length === 0) return "done";
   const pr = await pullFor(ctx, run);
   if (pr === "cut") return "cut";
-  for (let attempt = 1; attempt <= run.runAttempt; attempt += 1) {
-    const records = await readAttempt(ctx, run, attempt, pr);
-    if (records === "cut") return "cut";
-    ctx.records.push(...records);
+  const records: JobRecord[] = [];
+  let result: "done" | "cut" = "done";
+  for (const attempt of attempts) {
+    const read = await readAttempt(ctx, run, attempt, pr);
+    if (read === "cut") {
+      result = "cut";
+      break;
+    }
+    records.push(...read);
   }
-  return "done";
+  // The attempts read before a rate limit are kept: the next read starts after them.
+  if (records.length > 0) {
+    ctx.records.push(...records);
+    await ctx.onRecords(records);
+  }
+  return result;
+}
+
+function heldByRun(held: readonly HeldAttempt[]): Map<number, Set<number>> {
+  const byRun = new Map<number, Set<number>>();
+  for (const { runId, runAttempt } of held) {
+    const attempts = byRun.get(runId) ?? new Set<number>();
+    attempts.add(runAttempt);
+    byRun.set(runId, attempts);
+  }
+  return byRun;
 }
 
 /**
  * Read a repo's Actions history since a date into job records. The run listing carries no `created`
  * filter (GitHub caps a filtered listing at 1,000 results); it is newest first, so paging stops at the
- * first run older than `since`. A rate limit ends the read and returns what was read, marked cut short;
+ * first run older than `since`. Attempts in `held`, and the latest attempt of a run that has not
+ * completed, are not fetched. A rate limit ends the read and returns what was read, marked cut short;
  * any other failure (a bad token, a 5xx) throws, so it cannot pass for a short history.
  */
 export async function readGitHubActions(
@@ -202,7 +258,9 @@ export async function readGitHubActions(
     api: createApi(options.fetch, options.token),
     repo: options.repo,
     pulls: new Map(),
+    held: heldByRun(options.held ?? []),
     records: [],
+    onRecords: options.onRecords ?? (async () => {}),
   };
   let cutShort = false;
   const listed = await eachPage(

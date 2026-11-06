@@ -39,6 +39,8 @@ export interface ApiRun {
   headBranch: string | null;
   runAttempt: number;
   createdAt: string;
+  /** GitHub's run `status`: `completed` once the latest attempt has ended, otherwise it may still gain jobs. */
+  status: string;
 }
 
 export function parseRun(value: unknown): ApiRun {
@@ -46,8 +48,9 @@ export function parseRun(value: unknown): ApiRun {
   const id = num(run.id);
   const headSha = str(run.head_sha);
   const createdAt = str(run.created_at);
-  if (id === null || headSha === null || createdAt === null) {
-    throw new Error("GitHub sent a run without an id, head_sha or created_at");
+  const status = str(run.status);
+  if (id === null || headSha === null || createdAt === null || status === null) {
+    throw new Error("GitHub sent a run without an id, head_sha, created_at or status");
   }
   return {
     id,
@@ -56,6 +59,7 @@ export function parseRun(value: unknown): ApiRun {
     headBranch: str(run.head_branch),
     runAttempt: num(run.run_attempt) ?? 1,
     createdAt,
+    status,
   };
 }
 
