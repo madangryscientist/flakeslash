@@ -85,7 +85,8 @@ domain exists.
 
 ## Invariants
 
-1. **Exit codes are a contract.** `flakeslash` exits 0 on success, 2 on a usage error.
+1. **Exit codes are a contract.** `flakeslash` exits 0 on success, 1 when the run failed for a reason that
+   is not usage (an outage, a refused token), 2 on a usage error.
 2. **The CLI writes through `process.stdout` / `process.stderr`**, not `console` (the lint bans it
    outside `scripts/`).
 3. **UI is composed from `@hackcove/ui-react`.** A custom style or component is a flag, not a fix; a

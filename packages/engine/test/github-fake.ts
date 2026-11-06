@@ -84,6 +84,7 @@ export function run(id: number, createdAt: string, extra: Record<string, unknown
     head_sha: `${id}`.padStart(40, "a"),
     head_branch: "main",
     run_attempt: 1,
+    status: "completed",
     conclusion: "success",
     created_at: createdAt,
     ...extra,

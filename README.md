@@ -18,6 +18,7 @@ Open source flaky-test detection you can run yourself. MIT licensed.
 ```bash
 bun install
 bun run flakeslash --version
+GITHUB_TOKEN=... bun run flakeslash scan owner/repo   # jobs that failed and passed on one commit
 bun run typecheck && bun run lint && bun run format:check && bun run test
 bun run build && bun run test:e2e
 ```
