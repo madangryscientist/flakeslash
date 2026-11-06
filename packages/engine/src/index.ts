@@ -22,3 +22,5 @@ export {
   type ReadGitHubActionsResult,
   type Runner,
 } from "./providers/github-actions.ts";
+
+export { findJobFlakes, type FlakeEvidence, type JobFlake } from "./flakes.ts";
