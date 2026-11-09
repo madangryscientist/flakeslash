@@ -50,14 +50,16 @@ export function json(body: unknown, init: ResponseInit = {}): Response {
 export function fakeGitHub(routes: Record<string, Reply>) {
   const calls: string[] = [];
   const headers: Record<string, string>[] = [];
+  const redirects: (string | undefined)[] = [];
   const fetch: FetchLike = async (url, init) => {
     calls.push(url);
     headers.push(init.headers);
+    redirects.push(init.redirect);
     const reply = routes[url.replace(API, "")];
     if (reply === undefined) throw new Error(`unexpected request: ${url}`);
     return typeof reply === "function" ? reply() : reply.clone();
   };
-  return { fetch, calls, headers };
+  return { fetch, calls, headers, redirects };
 }
 
 export const RUNS = "/repos/" + REPO + "/actions/runs?per_page=100";
