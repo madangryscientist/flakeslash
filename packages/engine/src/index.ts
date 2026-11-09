@@ -16,8 +16,10 @@ export type { HeldAttempt, Store } from "./store.ts";
 export {
   isRepoName,
   readGitHubActions,
+  readJobLog,
   type FetchLike,
   type JobRecord,
+  type LogResult,
   type ReadGitHubActionsOptions,
   type ReadGitHubActionsResult,
   type Runner,

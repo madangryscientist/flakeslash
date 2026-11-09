@@ -1,9 +1,18 @@
 /**
  * The GitHub Actions reader: a repo's run history as one plain record per job per attempt. Nothing is
- * stored and no log is read. A run's own `conclusion` is its latest attempt's only (a flaky run reads
- * `success`), so every attempt up to `run_attempt` is read through its own jobs endpoint.
+ * stored, and `readGitHubActions` reads no log (`readJobLog` reads one). A run's own `conclusion` is its
+ * latest attempt's only (a flaky run reads `success`), so every attempt up to `run_attempt` is read
+ * through its own jobs endpoint.
  */
-import { API_BASE, createApi, GitHubApiError, type Api, type FetchLike } from "./github-api.ts";
+import { outcomeOf } from "../flakes.ts";
+import {
+  API_BASE,
+  createApi,
+  GitHubApiError,
+  type Api,
+  type FetchLike,
+  type LogResult,
+} from "./github-api.ts";
 import {
   listJobs,
   listRuns,
@@ -19,7 +28,7 @@ import {
 import type { HeldAttempt } from "../store.ts";
 import type { Runner } from "./github-runner.ts";
 
-export type { FetchLike } from "./github-api.ts";
+export type { FetchLike, LogResult } from "./github-api.ts";
 export type { Runner } from "./github-runner.ts";
 
 export interface JobRecord {
@@ -283,4 +292,25 @@ export async function readGitHubActions(
   if (listed === "gone")
     throw new GitHubApiError(404, `${API_BASE}/repos/${options.repo}/actions/runs`);
   return { records: ctx.records, cutShort: cutShort || listed === "cut" };
+}
+
+interface ReadJobLogOptions {
+  /** A job from `readGitHubActions`. */
+  job: JobRecord;
+  fetch: FetchLike;
+  /** Optional, as for `readGitHubActions`. */
+  token?: string;
+}
+
+/**
+ * The log of one failed job, as text in memory. It reads the job's own log endpoint, which answers for
+ * every attempt, so a failure of attempt 1 of a run that attempt 2 passed is readable; the run-level
+ * route is not (`gh run view --log-failed` prints nothing when the latest attempt passed). A job the
+ * flake rule does not count as failed is `gone` and makes no request. A bad token throws.
+ */
+export async function readJobLog(options: ReadJobLogOptions): Promise<LogResult> {
+  const { job } = options;
+  if (outcomeOf(job) !== "failed") return { status: "gone" };
+  const api = createApi(options.fetch, options.token);
+  return api.getLog(`${API_BASE}/repos/${job.repo}/actions/jobs/${job.jobId}/logs`);
 }

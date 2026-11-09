@@ -34,7 +34,11 @@ const CANCELLED_FAILURE_MESSAGES = [
   "exceeded the maximum execution time",
 ];
 
-function outcomeOf(record: JobRecord): FlakeEvidence["outcome"] | null {
+/**
+ * Whether a record counts as a failure, a pass, or neither. The one rule for what failed: the flake
+ * rule uses it, and so does the log reader.
+ */
+export function outcomeOf(record: JobRecord): FlakeEvidence["outcome"] | null {
   if (record.conclusion === "success") return "passed";
   if (record.conclusion === "failure" || record.conclusion === "timed_out") return "failed";
   if (record.conclusion === "cancelled") {
