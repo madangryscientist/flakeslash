@@ -6,7 +6,13 @@
 import { Database, type SQLQueryBindings } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import type { HeldAttempt, JobRecord, Runner, Store } from "@hackcove/flakeslash-engine";
+import {
+  isRunner,
+  type HeldAttempt,
+  type JobRecord,
+  type Runner,
+  type Store,
+} from "@hackcove/flakeslash-engine";
 
 const DEFAULT_STORE_PATH = ".flakeslash/flakeslash.db";
 
@@ -14,8 +20,6 @@ export interface SqliteStore extends Store {
   /** Closes the file. Not on `Store`: a D1 store has nothing to close. */
   close(): void;
 }
-
-const RUNNERS: Runner[] = ["github-hosted", "depot", "blacksmith", "self-hosted"];
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS jobs (
@@ -67,9 +71,8 @@ interface JobRow {
 }
 
 function runnerOf(value: string): Runner {
-  const found = RUNNERS.find((runner) => runner === value);
-  if (found === undefined) throw new Error(`the store holds an unknown runner: ${value}`);
-  return found;
+  if (!isRunner(value)) throw new Error(`the store holds an unknown runner: ${value}`);
+  return value;
 }
 
 function jobFromRow(row: JobRow): JobRecord {

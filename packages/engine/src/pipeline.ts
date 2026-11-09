@@ -7,7 +7,7 @@ import { findJobFlakes, type JobFlake } from "./flakes.ts";
 import { readGitHubActions, type FetchLike } from "./providers/github-actions.ts";
 import type { Store } from "./store.ts";
 
-export interface ScanRepoOptions {
+interface ScanRepoOptions {
   /** `owner/name`, in any case: GitHub repo names are case-insensitive. */
   repo: string;
   /** An ISO date. Limits reading only; flakes cover every row the store holds. */

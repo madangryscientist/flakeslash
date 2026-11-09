@@ -46,26 +46,36 @@ export function json(body: unknown, init: ResponseInit = {}): Response {
   });
 }
 
-/** A fetch over canned answers, keyed by path and query. An unlisted request fails the test: no live network. */
+/**
+ * A fetch over canned answers, keyed by path and query. An unlisted request fails the test: no live network.
+ * `routes` is the object given, which a test may change between scans; `paths` is each request's URL
+ * with `API` removed.
+ */
 export function fakeGitHub(routes: Record<string, Reply>) {
   const calls: string[] = [];
+  const paths: string[] = [];
   const headers: Record<string, string>[] = [];
   const redirects: (string | undefined)[] = [];
   const fetch: FetchLike = async (url, init) => {
     calls.push(url);
+    paths.push(url.replace(API, ""));
     headers.push(init.headers);
     redirects.push(init.redirect);
     const reply = routes[url.replace(API, "")];
     if (reply === undefined) throw new Error(`unexpected request: ${url}`);
     return typeof reply === "function" ? reply() : reply.clone();
   };
-  return { fetch, calls, headers, redirects };
+  return { fetch, calls, paths, headers, redirects, routes };
 }
 
-export const RUNS = "/repos/" + REPO + "/actions/runs?per_page=100";
-export const jobsPath = (runId: number, attempt: number) =>
-  `/repos/${REPO}/actions/runs/${runId}/attempts/${attempt}/jobs?per_page=100`;
-export const pullsPath = (sha: string) => `/repos/${REPO}/commits/${sha}/pulls`;
+export const RUNS = runsPath();
+export function runsPath(repo = REPO) {
+  return `/repos/${repo}/actions/runs?per_page=100`;
+}
+export const jobsPath = (runId: number, attempt: number, repo = REPO) =>
+  `/repos/${repo}/actions/runs/${runId}/attempts/${attempt}/jobs?per_page=100`;
+export const pullsPath = (sha: string, repo = REPO) => `/repos/${repo}/commits/${sha}/pulls`;
+export const shaOf = (runId: number) => `${runId}`.padStart(40, "a");
 export const since = "2026-11-01T00:00:00Z";
 
 /** The real run: three attempts, reads `success`, attempt 1 failed. */
@@ -83,7 +93,7 @@ export function run(id: number, createdAt: string, extra: Record<string, unknown
   return {
     id,
     name: "CI",
-    head_sha: `${id}`.padStart(40, "a"),
+    head_sha: shaOf(id),
     head_branch: "main",
     run_attempt: 1,
     status: "completed",
@@ -100,7 +110,7 @@ export function job(id: number, runId: number, extra: Record<string, unknown> = 
     run_attempt: 1,
     name: "Gate",
     workflow_name: "CI",
-    head_sha: `${runId}`.padStart(40, "a"),
+    head_sha: shaOf(runId),
     head_branch: "main",
     status: "completed",
     conclusion: "success",
