@@ -54,11 +54,7 @@ describe("readGitHubActions: attempts", () => {
     });
     expect(gate?.steps.length).toBeGreaterThan(0);
     expect(gate?.steps[0]).toEqual({ name: expect.any(String), conclusion: expect.any(String) });
-  });
-
-  it("gives the failed records of a run that reads success", async () => {
-    const gh = fakeGitHub(realRoutes());
-    const { records } = await readGitHubActions({ repo: REPO, since, fetch: gh.fetch });
+    // The run reads success, yet its failed records are kept: the latest attempt passed.
     expect(runsFixture().workflow_runs[0]?.conclusion).toBe("success");
     const failed = records.filter((r) => r.conclusion === "failure");
     expect(failed.map((r) => [r.runAttempt, r.jobId])).toEqual(

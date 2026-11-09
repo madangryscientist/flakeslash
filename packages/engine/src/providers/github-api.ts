@@ -40,7 +40,7 @@ export class GitHubApiError extends Error {
  * the secondary one answers 403 or 429 with `retry-after`. Any other 403 is a real refusal (a bad or
  * under-scoped token) and must not read as a short history.
  */
-export function isRateLimited(res: FetchResponse): boolean {
+function isRateLimited(res: FetchResponse): boolean {
   if (res.status === 429) return true;
   if (res.status !== 403) return false;
   return res.headers.get("x-ratelimit-remaining") === "0" || res.headers.has("retry-after");
@@ -52,7 +52,7 @@ const NEXT_LINK = /<([^>]+)>\s*;\s*rel="next"/;
  * The `rel="next"` URL of a Link header. One that leaves the API host throws: following it would send
  * the token elsewhere, and skipping it would end the read as if the history were complete.
  */
-export function nextLink(header: string | null): string | null {
+function nextLink(header: string | null): string | null {
   const url = header === null ? undefined : NEXT_LINK.exec(header)?.[1];
   if (url === undefined) return null;
   if (!url.startsWith(`${API_BASE}/`)) throw new Error(`GitHub sent a next link off ${API_BASE}`);

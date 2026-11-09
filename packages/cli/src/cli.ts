@@ -32,7 +32,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_SINCE_DAYS = 90;
 
 /** What the CLI reaches outside itself through, so a test can stand in for the network and the shell. */
-export interface Deps {
+interface Deps {
   fetch: FetchLike;
   env: Readonly<Record<string, string | undefined>>;
 }

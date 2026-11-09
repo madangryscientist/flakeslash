@@ -53,8 +53,17 @@ describe("the SQLite store", () => {
     expect(await store.readJobs(REPO)).toHaveLength(2);
   });
 
-  it("holds an attempt only once it is known and a new attempt of a known run is not held", async () => {
+  it("holds an attempt written with its jobs finished", async () => {
     await store.writeJobs([job({ runId: 10, runAttempt: 1 })]);
+
+    expect(await store.heldAttempts(REPO)).toEqual([{ runId: 10, runAttempt: 1 }]);
+  });
+
+  it("holds attempt 1 of a run and not attempt 2 while attempt 2 is unfinished", async () => {
+    await store.writeJobs([
+      job({ runId: 10, runAttempt: 1 }),
+      job({ runId: 10, runAttempt: 2, conclusion: null, completedAt: null }),
+    ]);
 
     expect(await store.heldAttempts(REPO)).toEqual([{ runId: 10, runAttempt: 1 }]);
   });
@@ -68,24 +77,6 @@ describe("the SQLite store", () => {
     expect(await store.readJobs(REPO)).toHaveLength(1);
   });
 
-  it("reads back a record deep-equal to the one written", async () => {
-    const written = job({
-      jobId: 7,
-      prNumber: null,
-      runner: "self-hosted",
-      runnerName: "",
-      conclusion: "cancelled",
-      steps: [
-        { name: "Set up job", conclusion: "success" },
-        { name: "Build", conclusion: null },
-      ],
-      annotations: [{ title: "Lost communication", message: "The runner stopped responding." }],
-    });
-    await store.writeJobs([written]);
-
-    expect(await store.readJobs(REPO)).toEqual([written]);
-  });
-
   it("does not return another repo's rows", async () => {
     await store.writeJobs([job({ runId: 10 }), job({ repo: OTHER, runId: 20 })]);
 
@@ -96,7 +87,20 @@ describe("the SQLite store", () => {
 
   it("keeps its rows when the file is closed and reopened", async () => {
     const path = join(dir, "flakeslash.db");
-    const written = [job(), job({ jobId: 2, conclusion: null, completedAt: null })];
+    const written = [
+      job({
+        jobId: 7,
+        prNumber: null,
+        runner: "self-hosted",
+        runnerName: "",
+        conclusion: "cancelled",
+        steps: [
+          { name: "Set up job", conclusion: "success" },
+          { name: "Build", conclusion: null },
+        ],
+        annotations: [{ title: "Lost communication", message: "The runner stopped responding." }],
+      }),
+    ];
     await store.writeJobs(written);
     store.close();
 

@@ -25,8 +25,10 @@ export {
   type Runner,
 } from "./providers/github-actions.ts";
 
-export { findJobFlakes, type FlakeEvidence, type JobFlake } from "./flakes.ts";
+export { findJobFlakes, type JobFlake } from "./flakes.ts";
+
+export { isRunner } from "./providers/github-runner.ts";
 
 export { GitHubApiError } from "./providers/github-api.ts";
 
-export { scanRepo, type RepoScan, type ScanRepoOptions } from "./pipeline.ts";
+export { scanRepo, type RepoScan } from "./pipeline.ts";
