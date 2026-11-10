@@ -36,3 +36,5 @@ export { isRunner } from "./providers/github-runner.ts";
 export { GitHubApiError } from "./providers/github-api.ts";
 
 export { scanRepo, type RepoScan } from "./pipeline.ts";
+
+export { signatures, type FailureSignature, type SignatureJob } from "./signature.ts";
