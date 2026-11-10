@@ -9,6 +9,7 @@ import { dirname } from "node:path";
 import {
   isRunner,
   type HeldAttempt,
+  type JobExcerpt,
   type JobRecord,
   type Runner,
   type Store,
@@ -44,6 +45,14 @@ CREATE TABLE IF NOT EXISTS jobs (
   PRIMARY KEY (provider, repo, run_id, run_attempt, job_id)
 );
 CREATE INDEX IF NOT EXISTS jobs_by_repo ON jobs (repo);
+CREATE TABLE IF NOT EXISTS excerpts (
+  repo TEXT NOT NULL,
+  job_id INTEGER NOT NULL,
+  url TEXT NOT NULL,
+  status TEXT NOT NULL,
+  excerpt TEXT,
+  PRIMARY KEY (repo, job_id)
+);
 `;
 
 const COLUMNS = `provider, repo, run_id, run_attempt, job_id, workflow, job_name, url, commit_sha,
@@ -68,6 +77,21 @@ interface JobRow {
   completed_at: string | null;
   steps: string;
   annotations: string;
+}
+
+interface ExcerptRow {
+  repo: string;
+  job_id: number;
+  url: string;
+  status: string;
+  excerpt: string | null;
+}
+
+function statusOf(value: string): JobExcerpt["status"] {
+  if (value !== "kept" && value !== "gone") {
+    throw new Error(`the store holds an unknown excerpt status: ${value}`);
+  }
+  return value;
 }
 
 function runnerOf(value: string): Runner {
@@ -147,6 +171,16 @@ export function openSqliteStore(path: string = DEFAULT_STORE_PATH): SqliteStore 
     `SELECT ${COLUMNS} FROM jobs WHERE repo = ? ORDER BY run_id, run_attempt, job_id`,
   );
 
+  const writeExcerptRow = db.prepare(
+    "INSERT OR REPLACE INTO excerpts (repo, job_id, url, status, excerpt) VALUES (?, ?, ?, ?, ?)",
+  );
+  const excerptIdsQuery = db.query<{ job_id: number }, [string]>(
+    "SELECT job_id FROM excerpts WHERE repo = ? ORDER BY job_id",
+  );
+  const excerptsQuery = db.query<ExcerptRow, [string]>(
+    "SELECT repo, job_id, url, status, excerpt FROM excerpts WHERE repo = ? ORDER BY job_id",
+  );
+
   return {
     async writeJobs(records: JobRecord[]): Promise<void> {
       writeAll(records);
@@ -156,6 +190,27 @@ export function openSqliteStore(path: string = DEFAULT_STORE_PATH): SqliteStore 
     },
     async readJobs(repo: string): Promise<JobRecord[]> {
       return readQuery.all(repo).map(jobFromRow);
+    },
+    async writeExcerpt(excerpt: JobExcerpt): Promise<void> {
+      writeExcerptRow.run(
+        excerpt.repo,
+        excerpt.jobId,
+        excerpt.url,
+        excerpt.status,
+        excerpt.excerpt,
+      );
+    },
+    async excerptJobIds(repo: string): Promise<number[]> {
+      return excerptIdsQuery.all(repo).map((row) => row.job_id);
+    },
+    async readExcerpts(repo: string): Promise<JobExcerpt[]> {
+      return excerptsQuery.all(repo).map((row) => ({
+        repo: row.repo,
+        jobId: row.job_id,
+        url: row.url,
+        status: statusOf(row.status),
+        excerpt: row.excerpt,
+      }));
     },
     close(): void {
       db.close();

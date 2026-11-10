@@ -11,7 +11,7 @@ export function describeEngine(): string {
   return `${ENGINE_NAME} ${ENGINE_VERSION}`;
 }
 
-export type { HeldAttempt, Store } from "./store.ts";
+export type { HeldAttempt, JobExcerpt, Store } from "./store.ts";
 
 export {
   isRepoName,
