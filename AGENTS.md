@@ -26,6 +26,9 @@ A small Nx workspace on Bun workspaces:
 `bunfig.toml` sets `[install] linker = "isolated"` and `globalStore = true`: a package sees its own declared dependencies and
 the root's, not another package's. Declare what a package imports in that package's `package.json`.
 
+CI runs these steps on the self-hosted `proxmox` runner, for same-repo commits only (`scripts/check-workflows.ts`
+enforces the guard).
+
 A change is green when all of these pass **from the worktree**:
 
 ```bash
