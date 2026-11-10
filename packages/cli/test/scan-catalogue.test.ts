@@ -13,69 +13,10 @@ import {
   runsOf,
   runsPath,
   shaOf,
-  type Reply,
 } from "../../engine/test/github-fake.ts";
-import { SINCE, useScan } from "./scan-harness.ts";
+import { SINCE, playwrightLog, routesOf, text, useScan } from "./scan-harness.ts";
 
 const OTHER = "madangryscientist/hackcove";
-
-const text = (body: string, status = 200): Response => new Response(body, { status });
-
-/** A Playwright log of failed tests: `[title, error line]` pairs, each a numbered block. */
-function playwrightLog(...tests: [string, string][]): string {
-  return [
-    "##[group]Run bunx playwright test",
-    ...tests.flatMap(([title, error], at) => [
-      `  ${at + 1}) [chromium] › e2e/upload.spec.ts:${141 + at}:1 › ${title} ──────────────`,
-      "",
-      `    ${error}`,
-      "",
-    ]),
-    `  ${tests.length} failed`,
-    "##[error]Process completed with exit code 1.",
-    "##[endgroup]",
-  ].join("\n");
-}
-
-/** One run of `repo` with one failed job (its `CI / Gate`) whose log is `log`. */
-function failedRun(
-  repo: string,
-  runId: number,
-  log: Reply,
-  extra: { run?: Record<string, unknown>; job?: Record<string, unknown> } = {},
-): Record<string, { run: unknown; routes: Record<string, Reply> }> {
-  const jobId = runId * 10;
-  return {
-    [repo]: {
-      run: run(runId, "2026-11-04T00:00:00Z", { conclusion: "failure", ...extra.run }),
-      routes: {
-        [pullsPath(shaOf(runId), repo)]: json([]),
-        [jobsPath(runId, 1, repo)]: jobsOf(
-          job(jobId, runId, {
-            conclusion: "failure",
-            html_url: `https://github.com/${repo}/actions/runs/${runId}/job/${jobId}`,
-            ...extra.job,
-          }),
-        ),
-        [logPath(jobId, repo)]: log,
-      },
-    },
-  };
-}
-
-/** The routes of a set of runs, each `[repo, runId, log]`, with the run listing of each repo. */
-function routesOf(...runs: [string, number, Reply][]): Record<string, Reply> {
-  const routes: Record<string, Reply> = {};
-  const byRepo = new Map<string, unknown[]>();
-  for (const [repo, runId, log] of runs) {
-    const made = failedRun(repo, runId, log)[repo];
-    if (made === undefined) continue;
-    Object.assign(routes, made.routes);
-    byRepo.set(repo, [...(byRepo.get(repo) ?? []), made.run]);
-  }
-  for (const [repo, list] of byRepo) routes[runsPath(repo)] = runsOf(...list);
-  return routes;
-}
 
 describe("flakeslash scan: failures grouped into issues", () => {
   const scan = useScan();
@@ -138,6 +79,8 @@ describe("flakeslash scan: failures grouped into issues", () => {
         kind: "browser-crash",
         status: "potential",
         signatures: [{ type: "pattern", all: ["Page crashed"] }],
+        explanation: null,
+        edited: false,
       },
     ]);
     const failures = await scan.failures();

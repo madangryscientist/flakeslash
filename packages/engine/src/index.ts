@@ -11,9 +11,9 @@ export function describeEngine(): string {
   return `${ENGINE_NAME} ${ENGINE_VERSION}`;
 }
 
-export { type Failure, type Issue, type IssueSignature } from "./catalogue.ts";
+export { type Explanation, type Failure, type Issue, type IssueSignature } from "./catalogue.ts";
 
-export type { HeldAttempt, JobExcerpt, Store } from "./store.ts";
+export type { HeldAttempt, JobExcerpt, ModelCall, Store } from "./store.ts";
 
 export {
   isRepoName,
@@ -57,3 +57,12 @@ export {
   type Kind,
   type LiteralPattern,
 } from "./starter-signatures.ts";
+
+export {
+  explainIssues,
+  parseExplanation,
+  type ExplainOptions,
+  type ExplainResult,
+  type ParseResult,
+  type ParsedExplanation,
+} from "./explain.ts";
