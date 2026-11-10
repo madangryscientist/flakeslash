@@ -2,7 +2,7 @@ import { Database } from "bun:sqlite";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { JobExcerpt, JobRecord } from "@hackcove/flakeslash-engine";
+import type { Failure, Issue, JobExcerpt, JobRecord } from "@hackcove/flakeslash-engine";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openSqliteStore, type SqliteStore } from "../src/store.ts";
 
@@ -32,6 +32,16 @@ function job(overrides: Partial<JobRecord> = {}): JobRecord {
     ...overrides,
   };
 }
+
+const issue = (id: string): Issue => ({
+  id,
+  name: id,
+  kind: "other",
+  status: "potential",
+  signatures: [{ type: "key", key: id }],
+  explanation: null,
+  edited: false,
+});
 
 const kept = (overrides: Partial<JobExcerpt> = {}): JobExcerpt => ({
   repo: REPO,
@@ -176,6 +186,77 @@ describe("the SQLite store", () => {
       } finally {
         opened.close();
       }
+    });
+
+    it("opens a store from before explanations: old issues read back with none, and take one", async () => {
+      const path = join(dir, "fl6.db");
+      const old = new Database(path, { create: true });
+      old.exec(
+        "CREATE TABLE issues (id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, status TEXT NOT NULL, signatures TEXT NOT NULL)",
+      );
+      old.exec(
+        `INSERT INTO issues VALUES ('key:abc', 'a test', 'other', 'potential', '[{"type":"key","key":"abc"}]')`,
+      );
+      old.close();
+
+      const opened = openSqliteStore(path);
+      try {
+        const [held] = await opened.readIssues();
+        expect(held).toEqual({
+          id: "key:abc",
+          name: "a test",
+          kind: "other",
+          status: "potential",
+          signatures: [{ type: "key", key: "abc" }],
+          explanation: null,
+          edited: false,
+        });
+        const explanation = {
+          component: "upload.spec.ts:141",
+          kind: "timeout" as const,
+          cause: "not visible in the excerpt",
+          evidence: "Test timeout of 30000ms exceeded.",
+          repo: REPO,
+          jobId: 1,
+          model: "m",
+        };
+        await opened.writeIssue({ ...held!, explanation, edited: true });
+        expect(await opened.readIssues()).toMatchObject([{ explanation, edited: true }]);
+        expect(await opened.readModelCalls()).toEqual([]);
+      } finally {
+        opened.close();
+      }
+    });
+
+    it("merges issues in one step: failures and model calls move, the merged issue goes", async () => {
+      const failure = (jobId: number, issueId: string): Failure => ({
+        repo: REPO,
+        jobId,
+        url: `u${jobId}`,
+        signature: `s${jobId}`,
+        issueId,
+        file: null,
+        title: null,
+        location: null,
+        errorLine: "",
+      });
+      for (const id of ["key:a", "key:b", "key:c"]) await store.writeIssue(issue(id));
+      await store.writeFailures([failure(1, "key:a"), failure(2, "key:b"), failure(3, "key:c")]);
+      await store.writeModelCall({ repo: REPO, jobId: 2, issueId: "key:b", outcome: "invalid" });
+
+      const survivor = { ...issue("key:a"), status: "confirmed" as const };
+      await store.mergeIssues(survivor, ["key:b"]);
+
+      expect((await store.readIssues()).map((held) => held.id)).toEqual(["key:a", "key:c"]);
+      expect((await store.readIssues())[0]?.status).toBe("confirmed");
+      expect((await store.readFailures()).map((held) => held.issueId)).toEqual([
+        "key:a",
+        "key:a",
+        "key:c",
+      ]);
+      expect(await store.readModelCalls()).toEqual([
+        { repo: REPO, jobId: 2, issueId: "key:a", outcome: "invalid" },
+      ]);
     });
   });
 });

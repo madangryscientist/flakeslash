@@ -12,6 +12,22 @@ export type IssueSignature =
   | { type: "key"; key: string }
   | { type: "pattern"; all: [string] | [string, string] };
 
+/** What the model said about an issue, from one redacted excerpt of one job. */
+export interface Explanation {
+  /** The test, as file:line or full name, or the CI step or tool that broke. */
+  component: string;
+  kind: Kind;
+  /** One or two sentences, or `not visible in the excerpt`. */
+  cause: string;
+  /** One line copied from the excerpt. Stored as given, not checked. */
+  evidence: string;
+  /** The excerpt that was sent: the job's repo (lower case) and id. */
+  repo: string;
+  jobId: number;
+  /** The model name asked for. */
+  model: string;
+}
+
 export interface Issue {
   /** `starter:<pattern name>` or `key:<entry signature>`. Deterministic, so a rescan cannot make a second one. */
   id: string;
@@ -20,6 +36,10 @@ export interface Issue {
   /** `confirmed` once one of its failures belongs to a proven flake. It never moves back. */
   status: "potential" | "confirmed";
   signatures: IssueSignature[];
+  /** Null until the model has explained the issue. */
+  explanation: Explanation | null;
+  /** True once a person has edited the issue (renamed it, say). The model never touches those. */
+  edited: boolean;
 }
 
 /** One failure of one job: one signature entry of its excerpt (or of its job record, with no log). */
@@ -72,7 +92,7 @@ function byCodePoint(a: Issue, b: Issue): number {
   return a.id < b.id ? -1 : 1;
 }
 
-function hasAll(all: readonly string[], text: string): boolean {
+export function hasAll(all: readonly string[], text: string): boolean {
   return all.every((part) => text.includes(part));
 }
 
@@ -97,6 +117,8 @@ export function place(
       kind: starter.kind,
       status: "potential",
       signatures: [{ type: "pattern", all: starter.all }],
+      explanation: null,
+      edited: false,
     };
     issues.set(id, issue);
     return { issue, created: true };
@@ -119,6 +141,8 @@ export function place(
     kind: "other",
     status: "potential",
     signatures: [{ type: "key", key: entry.signature }],
+    explanation: null,
+    edited: false,
   };
   issues.set(issue.id, issue);
   return { issue, created: true };

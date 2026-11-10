@@ -1,13 +1,17 @@
 import {
+  createModelClient,
   describeEngine,
+  explainIssues,
   GitHubApiError,
   isRepoName,
   scanRepo,
   type FetchLike,
   type ModelClientOptions,
+  type ModelFetch,
   type RepoScan,
 } from "@hackcove/flakeslash-engine";
 import pkg from "../package.json" with { type: "json" };
+import { summarizeExplanations, type Explanations } from "./explanations.ts";
 import { openSqliteStore } from "./store.ts";
 
 const HELP = `flakeslash: flaky-test detection from the terminal.
@@ -26,14 +30,16 @@ the full log. The whole log is never stored. Each failure is then grouped into a
 crash with other ports or times is one issue; known crashes are named by kind), with no model.
 The token comes from GITHUB_TOKEN.
 
-scan will use your own OpenAI-compatible endpoint where a model helps. Naming one means you set the
-spending cap and both prices; nothing is assumed, and it can never spend past the cap. The scan
-itself does not call a model yet; these options are checked and kept for the steps that will.
+scan explains the failures no known signature recognises, with your own OpenAI-compatible endpoint.
+With no endpoint named, nothing is sent anywhere and the summary says explanations are off. Naming
+one means you set the spending cap and both prices; nothing is assumed, and it can never spend past
+the cap. One redacted excerpt is sent per unexplained issue (never the log), so a failure repeated
+50 times costs one call. The model's answer is stored on the issue; the flake list never depends on it.
 
 Options for scan:
   --since <date>   read runs created on or after this date (default: 90 days ago)
   --store <path>   the SQLite file (default: .flakeslash/flakeslash.db)
-  --json           write { "repos": [...] } to stdout instead of the summary
+  --json           write { "repos": [...], "explanations": ... } to stdout instead of the summary
   --model-url <url>   the endpoint's base URL, http or https (or FLAKESLASH_MODEL_URL)
   --model <name>      the model to ask for (needed with --model-url)
   --cap-usd <n>       the most to spend, in USD, above 0 (needed with --model-url)
@@ -54,6 +60,8 @@ const DEFAULT_SINCE_DAYS = 90;
 /** What the CLI reaches outside itself through, so a test can stand in for the network and the shell. */
 interface Deps {
   fetch: FetchLike;
+  /** The model endpoint's POST; the real `fetch` unless a test stands in. */
+  modelFetch?: ModelFetch;
   env: Readonly<Record<string, string | undefined>>;
 }
 
@@ -214,52 +222,92 @@ function summarize(scan: RepoScan): string {
   return `${lines.join("\n")}\n`;
 }
 
-function report(scans: readonly RepoScan[], json: boolean): void {
-  if (json) process.stdout.write(`${JSON.stringify({ repos: scans })}\n`);
-  else process.stdout.write(scans.map(summarize).join("\n"));
+function report(scans: readonly RepoScan[], explanations: Explanations, json: boolean): void {
+  if (json) {
+    process.stdout.write(
+      `${JSON.stringify({ repos: scans, explanations: explanations.result })}\n`,
+    );
+  } else {
+    process.stdout.write(
+      `${scans.map(summarize).join("\n")}${summarizeExplanations(explanations)}`,
+    );
+  }
 }
 
-async function scanCommand(args: readonly string[], deps: Deps): Promise<number> {
-  let options: ScanArgs;
-  let token: string;
+/** The scan arguments and token, or null after a usage error was written. */
+function readScanArgs(
+  args: readonly string[],
+  deps: Deps,
+): { options: ScanArgs; token: string } | null {
   try {
-    options = parseScanArgs(args, deps.env);
-    const fromEnv = deps.env.GITHUB_TOKEN;
-    if (fromEnv === undefined || fromEnv === "") throw new UsageError("GITHUB_TOKEN is not set");
-    token = fromEnv;
+    const options = parseScanArgs(args, deps.env);
+    const token = deps.env.GITHUB_TOKEN;
+    if (token === undefined || token === "") throw new UsageError("GITHUB_TOKEN is not set");
+    return { options, token };
   } catch (error) {
     if (!(error instanceof UsageError)) throw error;
     process.stderr.write(`flakeslash: ${error.message}. Try --help.\n`);
+    return null;
+  }
+}
+
+/** Scans every repo, then (if a model is named) explains what is left. */
+async function scanAll(
+  { options, token }: { options: ScanArgs; token: string },
+  deps: Deps,
+  scans: RepoScan[],
+  explanations: Explanations,
+): Promise<void> {
+  const store = openSqliteStore(options.store);
+  try {
+    for (const repo of options.repos) {
+      scans.push(await scanRepo({ repo, since: options.since, fetch: deps.fetch, token, store }));
+    }
+    if (options.model !== undefined) {
+      const client = createModelClient({
+        ...options.model,
+        fetch: deps.modelFetch ?? globalThis.fetch,
+      });
+      explanations.result = await explainIssues({ store, client, model: options.model.model });
+    }
+  } finally {
+    store.close();
+  }
+}
+
+/** Writes the failure and returns the exit code: 2 for a repo that cannot be seen, else 1. */
+function failScan(error: unknown, options: ScanArgs, done: number): number {
+  const message = error instanceof Error ? error.message : String(error);
+  if (error instanceof GitHubApiError && error.httpStatus === 404) {
+    const repo = options.repos[done];
+    process.stderr.write(
+      `flakeslash: repo ${repo} was not found, or the token cannot see it (${message})\n`,
+    );
     return 2;
   }
+  process.stderr.write(`flakeslash: ${message}\n`);
+  return 1;
+}
+
+async function scanCommand(args: readonly string[], deps: Deps): Promise<number> {
+  const read = readScanArgs(args, deps);
+  if (read === null) return 2;
+  const { options } = read;
 
   const scans: RepoScan[] = [];
+  const explanations: Explanations = {
+    named: options.model !== undefined,
+    result: null,
+    capUsd: options.model?.capUsd ?? 0,
+  };
   let code = 0;
   try {
-    const store = openSqliteStore(options.store);
-    try {
-      for (const repo of options.repos) {
-        scans.push(await scanRepo({ repo, since: options.since, fetch: deps.fetch, token, store }));
-      }
-    } finally {
-      store.close();
-    }
+    await scanAll(read, deps, scans, explanations);
   } catch (error) {
-    const missing = error instanceof GitHubApiError && error.httpStatus === 404;
-    const message = error instanceof Error ? error.message : String(error);
-    if (missing) {
-      const repo = options.repos[scans.length];
-      process.stderr.write(
-        `flakeslash: repo ${repo} was not found, or the token cannot see it (${message})\n`,
-      );
-      code = 2;
-    } else {
-      process.stderr.write(`flakeslash: ${message}\n`);
-      code = 1;
-    }
+    code = failScan(error, options, scans.length);
   }
   // Repos finished before an error are still reported.
-  report(scans, options.json);
+  report(scans, explanations, options.json);
   return code;
 }
 

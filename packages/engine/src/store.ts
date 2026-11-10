@@ -26,6 +26,17 @@ export interface JobExcerpt {
   excerpt: string | null;
 }
 
+/** One job sent to the model. A job with a row here is never sent again. */
+export interface ModelCall {
+  /** Lower case, as the jobs table holds it. */
+  repo: string;
+  jobId: number;
+  /** The issue the excerpt was sent for. */
+  issueId: string;
+  /** `explained` stored an explanation; `invalid` got a reply that could not be used. */
+  outcome: "explained" | "invalid";
+}
+
 export interface Store {
   /** Stores the records. A record whose job is already held replaces that job's row. */
   writeJobs(records: JobRecord[]): Promise<void>;
@@ -52,4 +63,13 @@ export interface Store {
   failureJobIds(repo: string): Promise<number[]>;
   /** Every failure, across repos. */
   readFailures(): Promise<Failure[]>;
+  /** Stores the call. It replaces any row for that job. */
+  writeModelCall(call: ModelCall): Promise<void>;
+  /** Every job ever sent to the model. */
+  readModelCalls(): Promise<ModelCall[]>;
+  /**
+   * In one transaction: stores `survivor`, points every failure (and model call) of `mergedIds` at
+   * it, and deletes the merged issues. The caller has put their signatures on `survivor` already.
+   */
+  mergeIssues(survivor: Issue, mergedIds: string[]): Promise<void>;
 }

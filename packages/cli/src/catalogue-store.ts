@@ -5,9 +5,11 @@
 import type { Database } from "bun:sqlite";
 import {
   KINDS,
+  type Explanation,
   type Failure,
   type Issue,
   type IssueSignature,
+  type ModelCall,
   type Store,
 } from "@hackcove/flakeslash-engine";
 
@@ -17,7 +19,9 @@ CREATE TABLE IF NOT EXISTS issues (
   name TEXT NOT NULL,
   kind TEXT NOT NULL,
   status TEXT NOT NULL,
-  signatures TEXT NOT NULL
+  signatures TEXT NOT NULL,
+  explanation TEXT,
+  edited INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS failures (
   repo TEXT NOT NULL,
@@ -32,7 +36,33 @@ CREATE TABLE IF NOT EXISTS failures (
   PRIMARY KEY (repo, job_id, signature)
 );
 CREATE INDEX IF NOT EXISTS failures_by_issue ON failures (issue_id);
+CREATE TABLE IF NOT EXISTS model_calls (
+  repo TEXT NOT NULL,
+  job_id INTEGER NOT NULL,
+  issue_id TEXT NOT NULL,
+  outcome TEXT NOT NULL,
+  PRIMARY KEY (repo, job_id)
+);
 `;
+
+/** Columns added to `issues` after the first release of its table, for stores made before them. */
+const ISSUE_COLUMNS: readonly [string, string][] = [
+  ["explanation", "TEXT"],
+  ["edited", "INTEGER NOT NULL DEFAULT 0"],
+];
+
+/** Opens a store made by an earlier version: adds the `issues` columns it lacks. Additive only. */
+export function migrateCatalogue(db: Database): void {
+  const held = new Set(
+    db
+      .query<{ name: string }, []>("PRAGMA table_info(issues)")
+      .all()
+      .map((column) => column.name),
+  );
+  for (const [name, definition] of ISSUE_COLUMNS) {
+    if (!held.has(name)) db.exec(`ALTER TABLE issues ADD COLUMN ${name} ${definition}`);
+  }
+}
 
 interface IssueRow {
   id: string;
@@ -40,6 +70,8 @@ interface IssueRow {
   kind: string;
   status: string;
   signatures: string;
+  explanation: string | null;
+  edited: number;
 }
 
 interface FailureRow {
@@ -61,20 +93,100 @@ function issueFromRow(row: IssueRow): Issue {
     throw new Error(`the store holds an unknown issue status: ${row.status}`);
   }
   const signatures: IssueSignature[] = JSON.parse(row.signatures);
-  return { id: row.id, name: row.name, kind, status: row.status, signatures };
+  const explanation: Explanation | null =
+    row.explanation === null ? null : JSON.parse(row.explanation);
+  return {
+    id: row.id,
+    name: row.name,
+    kind,
+    status: row.status,
+    signatures,
+    explanation,
+    edited: row.edited === 1,
+  };
 }
 
 type CatalogueMethods = Pick<
   Store,
-  "readIssues" | "writeIssue" | "writeFailures" | "failureJobIds" | "readFailures"
+  | "readIssues"
+  | "writeIssue"
+  | "writeFailures"
+  | "failureJobIds"
+  | "readFailures"
+  | "writeModelCall"
+  | "readModelCalls"
+  | "mergeIssues"
 >;
 
-export function catalogueStore(db: Database): CatalogueMethods {
-  const writeIssueRow = db.prepare(
-    "INSERT OR REPLACE INTO issues (id, name, kind, status, signatures) VALUES (?, ?, ?, ?, ?)",
+function outcomeOf(value: string): ModelCall["outcome"] {
+  if (value !== "explained" && value !== "invalid") {
+    throw new Error(`the store holds an unknown model call outcome: ${value}`);
+  }
+  return value;
+}
+
+const WRITE_ISSUE = `INSERT OR REPLACE INTO issues (id, name, kind, status, signatures, explanation, edited)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`;
+
+/** The values of one issue's row, in column order. */
+function issueValues(issue: Issue): (string | number | null)[] {
+  return [
+    issue.id,
+    issue.name,
+    issue.kind,
+    issue.status,
+    JSON.stringify(issue.signatures),
+    issue.explanation === null ? null : JSON.stringify(issue.explanation),
+    issue.edited ? 1 : 0,
+  ];
+}
+
+/** Model calls and the merge of issues, which moves model calls along with failures. */
+function modelCallMethods(
+  db: Database,
+): Pick<CatalogueMethods, "writeModelCall" | "readModelCalls" | "mergeIssues"> {
+  const writeIssueRow = db.prepare(WRITE_ISSUE);
+  const writeCallRow = db.prepare(
+    "INSERT OR REPLACE INTO model_calls (repo, job_id, issue_id, outcome) VALUES (?, ?, ?, ?)",
   );
+  const callsQuery = db.query<
+    { repo: string; job_id: number; issue_id: string; outcome: string },
+    []
+  >("SELECT repo, job_id, issue_id, outcome FROM model_calls ORDER BY repo, job_id");
+  const moveFailures = db.prepare("UPDATE failures SET issue_id = ? WHERE issue_id = ?");
+  const moveCalls = db.prepare("UPDATE model_calls SET issue_id = ? WHERE issue_id = ?");
+  const deleteIssue = db.prepare("DELETE FROM issues WHERE id = ?");
+  const mergeAll = db.transaction((survivor: Issue, mergedIds: string[]) => {
+    writeIssueRow.run(...issueValues(survivor));
+    for (const id of mergedIds) {
+      moveFailures.run(survivor.id, id);
+      moveCalls.run(survivor.id, id);
+      deleteIssue.run(id);
+    }
+  });
+
+  return {
+    async writeModelCall(call: ModelCall): Promise<void> {
+      writeCallRow.run(call.repo, call.jobId, call.issueId, call.outcome);
+    },
+    async readModelCalls(): Promise<ModelCall[]> {
+      return callsQuery.all().map((row) => ({
+        repo: row.repo,
+        jobId: row.job_id,
+        issueId: row.issue_id,
+        outcome: outcomeOf(row.outcome),
+      }));
+    },
+    async mergeIssues(survivor: Issue, mergedIds: string[]): Promise<void> {
+      mergeAll(survivor, mergedIds);
+    },
+  };
+}
+
+export function catalogueStore(db: Database): CatalogueMethods {
+  const writeIssueRow = db.prepare(WRITE_ISSUE);
   const issuesQuery = db.query<IssueRow, []>(
-    "SELECT id, name, kind, status, signatures FROM issues ORDER BY id",
+    "SELECT id, name, kind, status, signatures, explanation, edited FROM issues ORDER BY id",
   );
   const writeFailureRow = db.prepare(
     `INSERT OR REPLACE INTO failures
@@ -105,17 +217,12 @@ export function catalogueStore(db: Database): CatalogueMethods {
   );
 
   return {
+    ...modelCallMethods(db),
     async readIssues(): Promise<Issue[]> {
       return issuesQuery.all().map(issueFromRow);
     },
     async writeIssue(issue: Issue): Promise<void> {
-      writeIssueRow.run(
-        issue.id,
-        issue.name,
-        issue.kind,
-        issue.status,
-        JSON.stringify(issue.signatures),
-      );
+      writeIssueRow.run(...issueValues(issue));
     },
     async writeFailures(failures: Failure[]): Promise<void> {
       writeFailuresAll(failures);

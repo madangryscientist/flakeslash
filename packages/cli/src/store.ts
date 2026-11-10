@@ -6,7 +6,7 @@
 import { Database, type SQLQueryBindings } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { CATALOGUE_SCHEMA, catalogueStore } from "./catalogue-store.ts";
+import { CATALOGUE_SCHEMA, catalogueStore, migrateCatalogue } from "./catalogue-store.ts";
 import {
   isRunner,
   type HeldAttempt,
@@ -156,6 +156,7 @@ export function openSqliteStore(path: string = DEFAULT_STORE_PATH): SqliteStore 
   mkdirSync(dirname(path), { recursive: true });
   const db = new Database(path, { create: true, strict: true });
   db.exec(SCHEMA);
+  migrateCatalogue(db);
 
   const upsert = db.prepare(
     `INSERT OR REPLACE INTO jobs (${COLUMNS}) VALUES (${Array(18).fill("?").join(", ")})`,

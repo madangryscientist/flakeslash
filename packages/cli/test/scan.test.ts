@@ -37,7 +37,8 @@ describe("flakeslash scan: the summary", () => {
     expect(first.code).toBe(0);
     expect(first.out.endsWith("\n")).toBe(true);
     const parsed = JSON.parse(first.out);
-    expect(Object.keys(parsed)).toEqual(["repos"]);
+    expect(Object.keys(parsed)).toEqual(["repos", "explanations"]);
+    expect(parsed.explanations).toBeNull();
     const [repo] = parsed.repos;
     expect(repo).toMatchObject({ repo: REPO, cutShort: false, newJobs: 12 });
     expect(repo.oldestRead).toBe("2026-11-03T16:39:07Z");
