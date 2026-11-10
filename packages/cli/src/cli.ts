@@ -12,7 +12,9 @@ import {
 } from "@hackcove/flakeslash-engine";
 import pkg from "../package.json" with { type: "json" };
 import { summarizeExplanations, type Explanations } from "./explanations.ts";
+import { issueCommand } from "./issue.ts";
 import { openSqliteStore } from "./store.ts";
+import { UsageError } from "./usage-error.ts";
 
 const HELP = `flakeslash: flaky-test detection from the terminal.
 
@@ -20,6 +22,10 @@ Usage:
   flakeslash scan <owner/repo>... [--since <date>] [--store <path>] [--json]
                          list the jobs that both failed and passed on one commit
                          [--model-url <url> --model <name> --cap-usd <n> --price-in <n> --price-out <n>]
+  flakeslash issue list [--all] [--json] [--store <path>]
+                         list the issues the store holds, most failures first
+  flakeslash issue confirm|dismiss <id> [--store <path>]
+  flakeslash issue rename <id> <name> [--store <path>]
   flakeslash --version   print the version
   flakeslash --help      print this help
 
@@ -51,6 +57,14 @@ Environment for scan:
   FLAKESLASH_MODEL_KEY      the endpoint's API key, sent as a bearer token (optional)
   FLAKESLASH_MODEL_HEADERS  extra request headers, one "Name: value" per line (optional)
 
+issue corrects one catalogue entry, and the correction survives every later scan. confirm marks the
+issue a real flake, dismiss hides it (a new failure that matches it still joins it, and it stays
+hidden), and rename sets its name (quote it; the model never renames it again). <id> is the full id
+or any prefix of 8 or more characters that matches one issue; list shows the first 16 characters.
+Options for issue list:
+  --all     also show dismissed issues
+  --json    write { "issues": [...] } with full ids to stdout
+
 Exit codes: 0 ok, 1 the run failed (an outage, a refused token), 2 a usage error.
 `;
 
@@ -64,9 +78,6 @@ interface Deps {
   modelFetch?: ModelFetch;
   env: Readonly<Record<string, string | undefined>>;
 }
-
-/** An error in how the command was called. It ends the run with exit code 2. */
-class UsageError extends Error {}
 
 /** The model endpoint a scan may call: everything `createModelClient` needs but the fetch. */
 export type ModelConfig = Omit<ModelClientOptions, "fetch">;
@@ -326,6 +337,7 @@ export async function run(
     return 0;
   }
   if (first === "scan") return scanCommand(rest, deps);
+  if (first === "issue") return issueCommand(rest);
   process.stderr.write(`flakeslash: unknown argument "${first}". Try --help.\n`);
   return 2;
 }

@@ -66,3 +66,14 @@ export {
   type ParseResult,
   type ParsedExplanation,
 } from "./explain.ts";
+
+export {
+  IssueError,
+  confirmIssue,
+  dismissIssue,
+  findIssue,
+  listIssues,
+  renameIssue,
+  type IssueStore,
+  type IssueSummary,
+} from "./issues.ts";

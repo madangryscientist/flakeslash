@@ -36,3 +36,21 @@ One pick that was tested is `gpt-6-luna` on the opencode-go endpoint, at about $
 ```bash
 export FLAKESLASH_MODEL_HEADERS='x-opencode-session: any-id-you-like'
 ```
+
+## Correcting the catalogue
+
+A scan groups failures into issues by itself. When it gets one wrong, you correct that one entry, and the correction survives every later scan:
+
+```bash
+flakeslash issue list                  # id, status, kind, failures and name, most failures first
+flakeslash issue confirm <id>          # you say it is a real flake
+flakeslash issue rename <id> "Ship API is down"
+flakeslash issue dismiss <id>          # hide it: not a flake, or not worth tracking
+flakeslash issue list --all            # include dismissed issues; --json gives full ids
+```
+
+- `list` shows the first 16 characters of each id. `<id>` is the full id or any prefix of 8 or more characters that matches exactly one issue; a prefix that matches none or several is refused (exit 2) and nothing is changed.
+- Rename and dismiss mark the issue as edited, so a model never renames or merges it. Confirm is a verdict, not an edit: a model may still explain a confirmed issue (one you also renamed or dismissed stays protected).
+- A new failure that matches a dismissed issue still joins it, and a scan never brings it back, even when one of its failures is part of a proven flake. `confirm` on a dismissed issue does.
+- These commands read the same store as `scan` (`--store`, default `.flakeslash/flakeslash.db`) and never create one: with no store they say to run `flakeslash scan` first.
+

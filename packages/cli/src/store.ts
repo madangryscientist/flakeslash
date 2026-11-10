@@ -16,7 +16,7 @@ import {
   type Store,
 } from "@hackcove/flakeslash-engine";
 
-const DEFAULT_STORE_PATH = ".flakeslash/flakeslash.db";
+export const DEFAULT_STORE_PATH = ".flakeslash/flakeslash.db";
 
 export interface SqliteStore extends Store {
   /** Closes the file. Not on `Store`: a D1 store has nothing to close. */

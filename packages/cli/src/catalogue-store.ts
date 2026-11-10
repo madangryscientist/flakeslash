@@ -89,7 +89,7 @@ interface FailureRow {
 function issueFromRow(row: IssueRow): Issue {
   const kind = KINDS.find((known) => known === row.kind);
   if (kind === undefined) throw new Error(`the store holds an unknown issue kind: ${row.kind}`);
-  if (row.status !== "potential" && row.status !== "confirmed") {
+  if (row.status !== "potential" && row.status !== "confirmed" && row.status !== "dismissed") {
     throw new Error(`the store holds an unknown issue status: ${row.status}`);
   }
   const signatures: IssueSignature[] = JSON.parse(row.signatures);

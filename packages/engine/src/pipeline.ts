@@ -126,7 +126,7 @@ async function groupFailures(
 
 /**
  * Marks `confirmed` every issue that has a failure in a proven flake: a failed job whose job and
- * commit also passed. Only ever `potential` to `confirmed`; nothing here moves an issue back.
+ * commit also passed. Only ever `potential` to `confirmed`: a dismissed issue stays dismissed, and nothing moves an issue back.
  */
 async function confirmIssues(
   store: Store,
@@ -141,7 +141,7 @@ async function confirmIssues(
   if (proven.size === 0) return;
   for (const failure of await store.readFailures()) {
     const issue = issues.get(failure.issueId);
-    if (!proven.has(failure.url) || issue === undefined || issue.status === "confirmed") continue;
+    if (!proven.has(failure.url) || issue === undefined || issue.status !== "potential") continue;
     issue.status = "confirmed";
     await store.writeIssue(issue);
   }

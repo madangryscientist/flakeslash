@@ -33,8 +33,11 @@ export interface Issue {
   id: string;
   name: string;
   kind: Kind;
-  /** `confirmed` once one of its failures belongs to a proven flake. It never moves back. */
-  status: "potential" | "confirmed";
+  /**
+   * `confirmed` once one of its failures belongs to a proven flake, or a person said so. A scan never
+   * moves it back. `dismissed` is a person's: it hides the issue, and a scan leaves it as it is.
+   */
+  status: "potential" | "confirmed" | "dismissed";
   signatures: IssueSignature[];
   /** Null until the model has explained the issue. */
   explanation: Explanation | null;
