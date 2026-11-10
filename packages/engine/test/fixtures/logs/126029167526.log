@@ -1,0 +1,160 @@
+…
+     ✓ answers on stdin write a config the loader takes, and the snapshot dirs are ignored 1900ms
+ ✓ test/import-native.test.ts (7 tests) 1396ms
+   ✓ pixelslash import --platform (PS-293) (7)
+     ✓ a PNG that is not viewport x scale is accepted, and the note names both sizes 765ms
+ ✓ test/mcp-dev.test.ts (4 tests) 10377ms
+   ✓ pixelslash mcp, feature mode over stdio (1)
+     ✓ start, run, latest, pin, unpin, spec and stop, each equal to its CLI twin 8657ms
+   ✓ pixelslash mcp, feature mode (3)
+     ✓ a session on another target is refused, and closing the server ends its session 1409ms
+ ✓ test/routes.test.ts (6 tests) 3116ms
+   ✓ routes (6)
+     ✓ N routes → 2N captures, 2N×|ds| judge calls, HTML index 332ms
+     ✓ missing judge: skip, HTML index, no fake violations 351ms
+     ✓ URL origins + routes capture each path, no nx 2355ms
+ ✓ test/upload.test.ts (9 tests) 3291ms
+   ✓ capture --upload (2)
+     ✓ uploads what it just captured 1330ms
+     ✓ without --upload nothing is sent, and upload-only flags are refused 1208ms
+ ✓ test/url.test.ts (8 tests | 1 skipped) 9494ms
+   ✓ fixture run (2)
+     ✓ live has 1 DS miss, local adds 1 new miss → exit 1, HTML names the new miss 1754ms
+     ✓ identical live/local → exit 0 1393ms
+   ✓ capture (2)
+     ✓ down URL fails and does not start nx 473ms
+     ✓ --width overrides the default 1304ms
+   ✓ capture settle (2)
+     ✓ end-to-end: content that arrives after domcontentloaded is in the shot 1624ms
+     ✓ two captures of the unchanged page are identical (changedPixels 0) 1477ms
+   ✓ judge parse (1)
+     ✓ mlx banners still yield OK vs VIOLATION; bare VIOLATION is mismatch 1436ms
+ ✓ test/parity.test.ts (12 tests) 145ms
+ ✓ test/mcp-local.test.ts (10 tests) 48283ms
+…
+   ✓ pixelslash mcp: the local fix loop over stdio (1)
+     ✓ a client spawning the bin captures a route and checks a flake against a served API 7376ms
+capture fixture on http://127.0.0.1:5133
+ ✓ test/builds.test.ts (13 tests) 833ms
+   ✓ upload with a personal token (2)
+     ✓ names the resolved project when it opens the build 687ms
+ ✓ test/capture.test.ts (6 tests) 6237ms
+   ✓ pixelslash capture (4)
+     ✓ starts the app from the config, captures every route × variant, stops it 2022ms
+   ✓ pixelslash capture, media (PS-230) (1)
+     ✓ warns on stderr and carries the rect in --json, per shot; a page without media has none 1264ms
+   ✓ pixelslash capture, composition-only (ob 1850) (1)
+     ✓ prints the gap list's counts and link, puts the findings in --json, and still exits 0 2604ms
+ ✓ test/usage.test.ts (13 tests) 6113ms
+   ✓ figma file (7)
+     ✓ list+raster writes pngs named after components, then new miss → exit 1 1792ms
+     ✓ identical live/local → exit 0 1301ms
+     ✓ temp raster dir (4)
+       ✓ a passing run leaves no pixelslash-ds-* behind 1271ms
+       ✓ a thrown judge error leaves none behind 1255ms
+       ✓ a capture error leaves none behind 434ms
+ ✓ test/crash.test.ts (6 tests) 632ms
+ ✓ test/check.test.ts (5 tests) 6876ms
+   ✓ pixelslash check (5)
+     ✓ --json says what changed against the server's pick, and sends only reads 1771ms
+     ✓ the summary names the changed shot under the counts line 1320ms
+     ✓ a server that does not report removed shots is said so, and --json has a null count 2224ms
+     ✓ a refused token is exit 3, after nothing was written to the server 1207ms
+     ✓ a bad flag, --only with no name, or an unknown route is a usage error, exit 2 324ms
+ ✓ test/project.test.ts (11 tests) 69ms
+ ✓ test/sentry.test.ts (4 tests) 706ms
+   ✓ the CLI reports to Sentry only when PIXELSLASH_SENTRY_DSN is set (PS-227) (4)
+     ✓ a crash arrives with release and environment, and with no token or image data 550ms
+ ✓ test/flake.test.ts (6 tests) 18539ms
+   ✓ pixelslash flake (5)
+     ✓ a random-position element: 5 runs, unstable, with the region and a report; --resolve does not resolve 5259ms
+     ✓ a stable page reports stable and exits 0; --resolve then marks it resolved 3364ms
+     ✓ --write writes only the change the user picks, and nothing on an empty answer 7019ms
+     ✓ --write adds the ignore area to the route's variant 2855ms
+ ✓ test/timings.test.ts (4 tests) 2857ms
+   ✓ step timings (ob 1791) (4)
+…
+   ✓ upload DIR re-captures through the config (ob 1737) (1)
+     ✓ a shot from another image is not captured again, and no browser is opened 445ms
+ ✓ test/mcp-lazy.test.ts (2 tests) 148ms
+ ✓ test/diff-wasm.test.ts (1 test) 75ms
+ ✓ test/capture-metrics.test.ts (2 tests) 3140ms
+   ✓ pixelslash capture with `metrics` (PS-294) (2)
+     ✓ on: each shot's file is written beside its PNG and named by the entry 1307ms
+     ✓ off, or unset: no file and no `metrics` in the manifest 1827ms
+ ❯ test/dev.test.ts (9 tests | 1 failed) 104350ms
+   ✓ pixelslash dev --once (4)
+     ✓ --json holds the regions, pixels, timings, files and judge, and nothing left 2564ms
+     ✓ --against main reads main's baselines and writes nothing to the server 1499ms
+     ✓ --against main without credentials says so and diffs locally 1264ms
+     ✓ a URL that is down fails with exit 2 and starts nothing 111ms
+   ❯ pixelslash dev (2)
+     × re-runs on a save, and a second dev attaches to the live session 90008ms
+     ✓ SIGTERM ends it like q, and the next dev starts its own session (ob 1761) 6742ms
+   ✓ pixelslash dev, a feature's spec and refs (ob 1741) (3)
+     ✓ dev spec --json is the spec text and the refs, inline images capped at 1024 px 169ms
+     ✓ --judge with a feature and no --ds lists differences, and with no judge says skip 1900ms
+     ✓ --judge with neither --ds nor a feature is a usage error 35ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/dev.test.ts > pixelslash dev > re-runs on a save, and a second dev attaches to the live session
+Error: Test timed out in 90000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ <anonymous> test/dev.test.ts:232:32
+    230|     expect(out.refs[0]).toMatchObject({
+    231|       kind: "png",
+    232|       file: join(cwd, "cart.png"),
+       |                                ^
+    233|       size: { width: 2048, height: 100 },
+    234|     });
+ ❯ processTicksAndRejections unknown:7:39
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 32 passed (33)
+      Tests  1 failed | 241 passed | 1 skipped (243)
+   Start at  15:52:30
+   Duration  111.56s (tests 83%, import 14%, transform 2%)
+
+
+##[error]Error: Test timed out in 90000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ <anonymous> test/dev.test.ts:232:32
+ ❯ processTicksAndRejections unknown:7:39
+
+
+error: "vitest" exited with code 1
+Warning: command "bun --bun vitest run" exited with non-zero status code
+##[endgroup]
+✔  nx run PixelSlash.Diff.Tests:test
+✔  nx run bench:test
+✔  nx run web:test
+
+
+
+ NX   Running target test for 7 projects and 6 tasks they depend on failed
+
+Failed tasks:
+
+- cli:test
+
+Output of 12 successful tasks were not shown. Run with --verbose or --output-style=static to see it.
+
+  Run duration:      2m 32s
+  Cache:             0/12 hit (0%)
+  Critical path:     1m 53s (1 task)
+  Recoverable time:  39.5s (26% of the run)
+
+  Recommendation: Increase parallelism to recover up to 39.5s → https://nx.dev/docs/concepts/ci-concepts/parallelization-distribution?utm_source=nx-cli&utm_medium=cli&utm_campaign=performance-report&utm_content=parallelization.
+error: script "test" exited with code 1
+##[error]Process completed with exit code 1.
+Post job cleanup.
+[command]/usr/bin/git version
+git version 2.56.0
+Temporarily overriding HOME='/home/runner/work/_temp/0ff087af-af6e-4f04-a09f-8d404a83e4c2' before making global git config changes
+Adding repository directory to the temporary git global config as a safe directory
+[command]/usr/bin/git config --global --add safe.directory /home/runner/work/pixelslash/pixelslash
+Removing SSH command configuration
+[command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand

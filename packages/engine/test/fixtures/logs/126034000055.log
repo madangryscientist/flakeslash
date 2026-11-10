@@ -1,0 +1,22 @@
+…
+npm notice package size: 148.3 kB
+npm notice unpacked size: 498.0 kB
+npm notice shasum: d6a6a55a9412c451d14539ebc355c1626d04e4df
+npm notice integrity: sha512-NeL+zxaXfUphK[...]w+lUG2bBmwOlg==
+npm notice total files: 6
+npm notice
+npm notice npm tokens that bypass 2FA are being restricted for account changes and direct publishing. Learn how to prepare: https://gh.io/npm-gat-bypass2fa-deprecation
+npm notice Publishing to https://registry.npmjs.org/ with tag latest and public access
+npm error code TLOG_CREATE_ENTRY_ERROR
+npm error error creating tlog entry - (409) an equivalent entry already exists in the transparency log with UUID 108e9186e8c5677a5fe9ab59617a3fedafe07b6423f842e4c6e79b637479d45c6cf6603087d3d681
+npm error cause (409) an equivalent entry already exists in the transparency log with UUID 108e9186e8c5677a5fe9ab59617a3fedafe07b6423f842e4c6e79b637479d45c6cf6603087d3d681
+npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-11-03T16_00_25_604Z-debug-0.log
+##[error]Process completed with exit code 1.
+Post job cleanup.
+[command]/usr/bin/git version
+git version 2.56.0
+Temporarily overriding HOME='/home/runner/work/_temp/76467413-6058-469e-8f95-22a1748bea5d' before making global git config changes
+Adding repository directory to the temporary git global config as a safe directory
+[command]/usr/bin/git config --global --add safe.directory /home/runner/work/pixelslash/pixelslash
+Removing SSH command configuration
+[command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand

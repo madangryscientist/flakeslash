@@ -1,0 +1,71 @@
+…
+  ✓   9 [chromium] › e2e/composition.spec.ts:98:1 › a new shot, which nothing measured, still has its boxes, placed on the image's own size (2.4s)
+  ✓  10 [chromium] › e2e/diff-overrides.spec.ts:11:1 › an override set on the snapshot screen flips the verdict and exports as config (4.3s)
+  ✓  11 [chromium] › e2e/flakes.spec.ts:11:1 › a flaky shot under each policy: badge, summary line, config line, resolve and reopen (4.4s)
+  ✓  12 [chromium] › e2e/google-sign-in.spec.ts:8:1 › sign in with Google, then with GitHub as the same email, and stay one user (1.4s)
+  ✓  13 [chromium] › e2e/ignore-boxes.spec.ts:28:1 › a box drawn over the change flips the verdict, exports as config, and stays in its org (8.8s)
+  ✓  14 [chromium] › e2e/metrics.spec.ts:26:1 › a diffed build states its wall time, counts and compare time, and the branch its window (2.7s)
+  ✓  15 [chromium] › e2e/org-tokens.spec.ts:4:1 › mint an org token in the org settings, see it is live, revoke it (1.9s)
+  ✓  16 [chromium] › e2e/orgs.spec.ts:4:1 › an empty org says what a project is, and a pending invite can be withdrawn (2.2s)
+  ✓  17 [chromium] › e2e/rerun.spec.ts:11:1 › an errored shot is re-run from the build page, and the build gets its verdict (5.6s)
+  ✓  18 [chromium] › e2e/review.spec.ts:196:1 › the review screens: j/k walk, overlay from stored regions, accept, reject, accept all (16.5s)
+  ✓  19 [chromium] › e2e/review.spec.ts:300:1 › the branch page: against main, since last build, and an accept the build page agrees with (5.0s)
+  ✓  20 [chromium] › e2e/review.spec.ts:330:1 › a decision moves the reviewer on: accept advances, a failed decision stays put (4.6s)
+  ✓  21 [chromium] › e2e/review.spec.ts:361:1 › re-deciding a shot: a rejection goes to the build page (4.6s)
+  -  22 [chromium] › e2e/rss-burst.spec.ts:110:1 › workerd RSS across a burst of 0 full-page shots
+  ✓  23 [chromium] › e2e/sentry.spec.ts:18:1 › a browser error reaches Sentry with release and environment, and no cookie, token or image (879ms)
+  ✓  24 [chromium] › e2e/sign-in.spec.ts:9:1 › sign in with GitHub, create a project and issue a CI token (2.6s)
+  ✓  25 [chromium] › e2e/slider.spec.ts:9:1 › Details and Tools start shut; the slider draws both shots at one scale, drags on the image and takes the keyboard (3.7s)
+service core:user:pixelslash-web: Uncaught Error: refusing to start: GITHUB_OAUTH_BASE is http://localhost:4174 and GITHUB_API_BASE is http://localhost:4174, but a production build signs in only through https://github.com and https://api.github.com. Another base is the e2e GitHub stand-in, which lets anyone sign in as anyone; it is for a dev server or the test build (CLOUDFLARE_ENV=e2e bun run build) only.
+  at index.js:16401:20
+  ✓  26 [chromium] › e2e/stub-refusal.spec.ts:121:3 › a production build and the GitHub stand-in › pointed at the stand-in, it does not start, and says why (300ms)
+  ✓  27 [chromium] › e2e/stub-refusal.spec.ts:127:3 › a production build and the GitHub stand-in › pointed at GitHub, the same build starts; with no Google client, no Google sign-in (283ms)
+  ✓  28 [chromium] › e2e/theme.spec.ts:6:3 › a visitor who follows the system and has chosen nothing › reaches dark with no cookie (124ms)
+  ✓  29 [chromium] › e2e/theme.spec.ts:16:3 › a light system › starts light, and an explicit choice survives a reload with the class server-rendered (671ms)
+  ✓  30 [chromium] › e2e/theme.spec.ts:44:1 › an explicit light choice beats a dark system (513ms)
+  ✓  31 [chromium] › e2e/timings.spec.ts:19:1 › a diffed build shows its server timings, and the org's Timings tab their p50 and max (2.7s)
+  ✓  32 [chromium] › e2e/timings.spec.ts:62:1 › with no build the Timings tab says so, not a row of dashes (2.2s)
+  ✘  33 [chromium] › e2e/upload.spec.ts:141:1 › the CLI uploads a snapshot dir; rows and R2 objects land under the right org (30.0s)
+  ✓  34 [chromium] › e2e/upload.spec.ts:230:1 › a dir of loose PNGs goes through `import` and `upload`, and the server diffs it (3.7s)
+  ✓  35 [chromium] › e2e/upload.spec.ts:266:1 › a project switched to CI diffs in the CLI: the server stores what it measured (ob 1727) (3.7s)
+  ✓  36 [chromium] › e2e/user-tokens.spec.ts:3:1 › issue a personal token in settings, see it once, use it, revoke it (1.2s)
+
+
+  1) [chromium] › e2e/upload.spec.ts:141:1 › the CLI uploads a snapshot dir; rows and R2 objects land under the right org 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByRole('link', { name: 'ship settings' })
+
+
+       at orgs-page.ts:25
+
+      23 | /** On an org's page: a project's settings, through its row's gear. */
+      24 | export async function openSettings(page: Page, project: string): Promise<void> {
+    > 25 |   await page.getByRole("link", { name: `${project} settings` }).click();
+         |                                                                 ^
+      26 | }
+      27 |
+        at openSettings (/home/runner/work/pixelslash/pixelslash/apps/web/e2e/orgs-page.ts:25:65)
+        at /home/runner/work/pixelslash/pixelslash/apps/web/e2e/upload.spec.ts:222:9
+
+    Error Context: test-results/upload-the-CLI-uploads-a-s-5dba1-ts-land-under-the-right-org-chromium/error-context.md
+
+    Error Context: test-results/upload-the-CLI-uploads-a-s-5dba1-ts-land-under-the-right-org-chromium/error-context.md
+
+  1 failed
+    [chromium] › e2e/upload.spec.ts:141:1 › the CLI uploads a snapshot dir; rows and R2 objects land under the right org 
+  1 skipped
+  34 passed (3.0m)
+error: script "test:e2e:dev" exited with code 1
+##[error]Process completed with exit code 1.
+Post job cleanup.
+[command]/usr/bin/git version
+git version 2.56.0
+Temporarily overriding HOME='/home/runner/work/_temp/ffe48a9f-8ae8-4d1d-a2b6-304df290ba54' before making global git config changes
+Adding repository directory to the temporary git global config as a safe directory
+[command]/usr/bin/git config --global --add safe.directory /home/runner/work/pixelslash/pixelslash
+Removing SSH command configuration
+[command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand

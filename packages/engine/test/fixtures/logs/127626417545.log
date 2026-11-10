@@ -1,0 +1,112 @@
+…
+[WebServer] 
+
+Running 48 tests using 1 worker
+
+[WebServer] server diff: in-process (unset): DIFF_SIDECAR_URL is not set
+  ✓   1 [chromium] › e2e/action-row.spec.ts:42:1 › the action row keeps its place as j walks shots with short and long titles (7.8s)
+  ✓   2 [chromium] › e2e/admin.spec.ts:12:1 › a visitor who is not signed in gets a 404, not a sign-in redirect (271ms)
+  ✓   3 [chromium] › e2e/admin.spec.ts:22:1 › a signed-in user who is not listed gets a 404 (6.4s)
+  ✓   4 [chromium] › e2e/admin.spec.ts:34:1 › a listed operator sees the page: every group, and what it cannot read says why (1.0s)
+  ✓   5 [chromium] › e2e/admin.spec.ts:67:1 › each window reads snapshots per build and time per snapshot, in both themes, at desktop and phone width (5.6s)
+  ✓   6 [chromium] › e2e/ai-review.spec.ts:20:1 › an opted-in project's model auto-passes a noise-only shot and says why (4.6s)
+  ✓   7 [chromium] › e2e/ai-review.spec.ts:76:1 › a build with 10 changed shots gets no summary, says why, and offers no Regenerate (10.5s)
+  ✓   8 [chromium] › e2e/ai-review.spec.ts:110:1 › with no model a changed shot is reviewed as plain pixels (4.2s)
+  ✓   9 [chromium] › e2e/ai-review.spec.ts:134:1 › a project without its own model uses the org's, and its own overrides it (5.9s)
+  ✓  10 [chromium] › e2e/brief.spec.ts:28:1 › a brief is shown as text, and the summary reads the build against it (5.1s)
+  ✓  11 [chromium] › e2e/carried-from-main.spec.ts:12:1 › a build held open by differences from main shows them as changed and new (5.6s)
+  ✓  12 [chromium] › e2e/composition.spec.ts:30:1 › one gap and one special case are listed and drawn on the branch shot (4.3s)
+…
+  ✓  18 [chromium] › e2e/layout-metrics.spec.ts:109:1 › metrics beside imported PNGs are uploaded, shown in the side panel and given by the API read (6.6s)
+  ✓  19 [chromium] › e2e/metrics.spec.ts:26:1 › a diffed build states its wall time, counts and compare time, and the branch its window (3.5s)
+  ✓  20 [chromium] › e2e/native.spec.ts:114:1 › an android import uploads and diffs against its own baseline; web is untouched; a new device is a re-baseline (14.4s)
+  ✓  21 [chromium] › e2e/org-tokens.spec.ts:4:1 › mint an org token in the org settings, see it is live, revoke it (2.4s)
+  ✓  22 [chromium] › e2e/orgs.spec.ts:4:1 › an empty org says what a project is, and a pending invite can be withdrawn (2.8s)
+  ✓  23 [chromium] › e2e/parity.spec.ts:62:1 › the side panel opens the parity view: web and android side by side, no ios twin, a metrics sentence (4.4s)
+  ✓  24 [chromium] › e2e/parity.spec.ts:111:1 › all three platforms side by side, and an unlinked shot opens the view (4.4s)
+  ✓  25 [chromium] › e2e/parity.spec.ts:146:1 › a web-only project has no Compare platforms link (3.2s)
+  ✓  26 [chromium] › e2e/rerun.spec.ts:11:1 › an errored shot is re-run from the build page, and the build gets its verdict (7.1s)
+  ✓  27 [chromium] › e2e/review.spec.ts:196:1 › the review screens: j/k walk, overlay from stored regions, accept, reject, accept all (21.6s)
+  ✓  28 [chromium] › e2e/review.spec.ts:300:1 › the branch page: against main, since last build, and an accept the build page agrees with (6.4s)
+  ✓  29 [chromium] › e2e/review.spec.ts:330:1 › a decision moves the reviewer on: accept advances, a failed decision stays put (6.0s)
+  ✘  30 [chromium] › e2e/review.spec.ts:361:1 › re-deciding a shot: a rejection goes to the build page (2.6s)
+  -  31 [chromium] › e2e/rss-burst.spec.ts:110:1 › workerd RSS across a burst of 0 full-page shots
+  ✓  32 [chromium] › e2e/sentry.spec.ts:18:1 › a browser error reaches Sentry with release and environment, and no cookie, token or image (1.0s)
+  ✓  33 [chromium] › e2e/sign-in.spec.ts:9:1 › sign in with GitHub, create a project and issue a CI token (4.1s)
+  ✓  34 [chromium] › e2e/slider.spec.ts:9:1 › Details and Tools start shut; the slider draws both shots at one scale, drags on the image and takes the keyboard (4.6s)
+  ✓  35 [chromium] › e2e/stale.spec.ts:85:1 › accepting a web change makes the android twin stale until an android shot is accepted (9.5s)
+service core:user:pixelslash-web: Uncaught Error: refusing to start: GITHUB_OAUTH_BASE is http://localhost:4174 and GITHUB_API_BASE is http://localhost:4174, but a production build signs in only through https://github.com and https://api.github.com. Another base is the e2e GitHub stand-in, which lets anyone sign in as anyone; it is for a dev server or the test build (CLOUDFLARE_ENV=e2e bun run build) only.
+  at index.js:16401:20
+  ✓  36 [chromium] › e2e/stub-refusal.spec.ts:121:3 › a production build and the GitHub stand-in › pointed at the stand-in, it does not start, and says why (445ms)
+  ✓  37 [chromium] › e2e/stub-refusal.spec.ts:127:3 › a production build and the GitHub stand-in › pointed at GitHub, the same build starts; with no Google client, no Google sign-in (432ms)
+  ✓  38 [chromium] › e2e/theme.spec.ts:6:3 › a visitor who follows the system and has chosen nothing › reaches dark with no cookie (156ms)
+  ✓  39 [chromium] › e2e/theme.spec.ts:16:3 › a light system › starts light, and an explicit choice survives a reload with the class server-rendered (1.3s)
+  ✓  40 [chromium] › e2e/theme.spec.ts:44:1 › an explicit light choice beats a dark system (1.1s)
+  ✓  41 [chromium] › e2e/timings.spec.ts:19:1 › a diffed build shows its server timings, and the org's Timings tab their p50 and max (3.7s)
+  ✓  42 [chromium] › e2e/timings.spec.ts:62:1 › with no build the Timings tab says so, not a row of dashes (3.1s)
+  ✓  43 [chromium] › e2e/twins.spec.ts:54:1 › a web and an android shot of one name and theme are twins; an android-only one is unlinked (5.6s)
+  ✓  44 [chromium] › e2e/twins.spec.ts:93:1 › the project settings link a twin project of the same org, and clear it (4.0s)
+  ✘  45 [chromium] › e2e/upload.spec.ts:141:1 › the CLI uploads a snapshot dir; rows and R2 objects land under the right org (30.0s)
+  ✓  46 [chromium] › e2e/upload.spec.ts:230:1 › a dir of loose PNGs goes through `import` and `upload`, and the server diffs it (5.3s)
+  ✓  47 [chromium] › e2e/upload.spec.ts:266:1 › a project switched to CI diffs in the CLI: the server stores what it measured (ob 1727) (5.1s)
+  ✓  48 [chromium] › e2e/user-tokens.spec.ts:3:1 › issue a personal token in settings, see it once, use it, revoke it (1.8s)
+
+
+  1) [chromium] › e2e/review.spec.ts:361:1 › re-deciding a shot: a rejection goes to the build page 
+
+    Error: no project id in http://localhost:36065/orgs?org=9dc8915e-616f-41c1-96f1-907c39df2f1b
+
+      146 |   await page.getByRole("link", { name: "shop", exact: true }).click();
+      147 |   const projectId = /\/projects\/([^/]+)/.exec(page.url())?.[1];
+    > 148 |   if (!projectId) throw new Error(`no project id in ${page.url()}`);
+          |                         ^
+      149 |   return { token, projectId };
+      150 | }
+      151 |
+        at provision (/home/runner/work/pixelslash/pixelslash/apps/web/e2e/review.spec.ts:148:25)
+        at threeChangedBuild (/home/runner/work/pixelslash/pixelslash/apps/web/e2e/review.spec.ts:321:32)
+        at /home/runner/work/pixelslash/pixelslash/apps/web/e2e/review.spec.ts:362:3
+
+    Error Context: test-results/review-re-deciding-a-shot-a-rejection-goes-to-the-build-page-chromium/error-context.md
+
+    Error Context: test-results/review-re-deciding-a-shot-a-rejection-goes-to-the-build-page-chromium/error-context.md
+
+  2) [chromium] › e2e/upload.spec.ts:141:1 › the CLI uploads a snapshot dir; rows and R2 objects land under the right org 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByRole('link', { name: 'ship settings' })
+
+
+       at orgs-page.ts:25
+
+      23 | /** On an org's page: a project's settings, through its row's gear. */
+      24 | export async function openSettings(page: Page, project: string): Promise<void> {
+    > 25 |   await page.getByRole("link", { name: `${project} settings` }).click();
+         |                                                                 ^
+      26 | }
+      27 |
+        at openSettings (/home/runner/work/pixelslash/pixelslash/apps/web/e2e/orgs-page.ts:25:65)
+        at /home/runner/work/pixelslash/pixelslash/apps/web/e2e/upload.spec.ts:222:9
+
+    Error Context: test-results/upload-the-CLI-uploads-a-s-5dba1-ts-land-under-the-right-org-chromium/error-context.md
+
+    Error Context: test-results/upload-the-CLI-uploads-a-s-5dba1-ts-land-under-the-right-org-chromium/error-context.md
+
+  2 failed
+    [chromium] › e2e/review.spec.ts:361:1 › re-deciding a shot: a rejection goes to the build page ─
+    [chromium] › e2e/upload.spec.ts:141:1 › the CLI uploads a snapshot dir; rows and R2 objects land under the right org 
+  1 skipped
+  45 passed (4.8m)
+error: script "test:e2e:dev" exited with code 1
+##[error]Process completed with exit code 1.
+Post job cleanup.
+[command]/usr/bin/git version
+git version 2.56.0
+Temporarily overriding HOME='/home/runner/work/_temp/fb907464-0fa7-4b4c-b18b-731a1e795a59' before making global git config changes
+Adding repository directory to the temporary git global config as a safe directory
+[command]/usr/bin/git config --global --add safe.directory /home/runner/work/pixelslash/pixelslash
+Removing SSH command configuration
+[command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand

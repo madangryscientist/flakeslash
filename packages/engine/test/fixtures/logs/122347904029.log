@@ -1,0 +1,44 @@
+…
+
+
+✔  nx run playwright:lint
+
+##[group]❌ > nx run engine:lint
+
+> oxlint --type-aware --deny-warnings packages/engine && bun scripts/check-slop.ts packages/engine
+
+##[error]packages/engine/src/zz-deliberate-lint-error.ts:1:37: `debugger` statement is not allowed
+
+Found 0 warnings and 1 error.
+Finished in 2.3s on 133 files with 213 rules using 2 threads.
+Warning: command "oxlint --type-aware --deny-warnings packages/engine && bun scripts/check-slop.ts packages/engine" exited with non-zero status code
+##[endgroup]
+✔  nx run cli:lint
+✔  nx run scripts:lint
+✔  nx run bench:lint
+✔  nx run web:lint
+
+
+
+ NX   Running target lint for 6 projects failed
+
+Failed tasks:
+
+- engine:lint
+
+Output of 5 successful tasks were not shown. Run with --verbose or --output-style=static to see it.
+
+  Run duration:      7.0s
+  Cache:             0/5 hit (0%)
+  Critical path:     5.9s (1 task)
+  Recoverable time:  1.1s (16% of the run)
+error: script "lint" exited with code 1
+##[error]Process completed with exit code 1.
+Post job cleanup.
+[command]/usr/bin/git version
+git version 2.55.0
+Temporarily overriding HOME='/home/runner/work/_temp/b710f354-ab44-4e97-b8d0-f20b8b0dc4dd' before making global git config changes
+Adding repository directory to the temporary git global config as a safe directory
+[command]/usr/bin/git config --global --add safe.directory /home/runner/work/pixelslash/pixelslash
+Removing SSH command configuration
+[command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand

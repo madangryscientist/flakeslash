@@ -1,0 +1,19 @@
+…
+  HEAD_SHA: 10aee0a7b60e59a5d02391f34e03f5f2decf62d2
+  KEY_SET: true
+  OPENCODE_API_KEY: ***
+  GITHUB_TOKEN: ***
+  LLMS_PATH: ./apps/hack-cove-site/dist/ui/llms.txt
+  PR_NUMBER: 18
+  REPO: madangryscientist/hackcove
+##[endgroup]
+##[error]the model review did not run: opencode was stopped by SIGTERM (timeout 600000 ms)
+##[error]Process completed with exit code 1.
+Post job cleanup.
+[command]/usr/bin/git version
+git version 2.56.0
+Temporarily overriding HOME='/home/runner/work/_temp/ef017d2f-7545-4d13-b75c-686edf39ba17' before making global git config changes
+Adding repository directory to the temporary git global config as a safe directory
+[command]/usr/bin/git config --global --add safe.directory /home/runner/work/hackcove/hackcove
+[command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+[command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
