@@ -75,6 +75,7 @@ export function runsPath(repo = REPO) {
 export const jobsPath = (runId: number, attempt: number, repo = REPO) =>
   `/repos/${repo}/actions/runs/${runId}/attempts/${attempt}/jobs?per_page=100`;
 export const pullsPath = (sha: string, repo = REPO) => `/repos/${repo}/commits/${sha}/pulls`;
+export const logPath = (jobId: number, repo = REPO) => `/repos/${repo}/actions/jobs/${jobId}/logs`;
 export const shaOf = (runId: number) => `${runId}`.padStart(40, "a");
 export const since = "2026-11-01T00:00:00Z";
 

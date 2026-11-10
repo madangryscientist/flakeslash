@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { JobRecord } from "@hackcove/flakeslash-engine";
+import type { JobExcerpt, JobRecord } from "@hackcove/flakeslash-engine";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openSqliteStore, type SqliteStore } from "../src/store.ts";
 
@@ -31,6 +31,15 @@ function job(overrides: Partial<JobRecord> = {}): JobRecord {
     ...overrides,
   };
 }
+
+const kept = (overrides: Partial<JobExcerpt> = {}): JobExcerpt => ({
+  repo: REPO,
+  jobId: 1,
+  url: "https://github.com/madangryscientist/pixelslash/actions/runs/10/job/1",
+  status: "kept",
+  excerpt: "Error: expected 1 to be 2",
+  ...overrides,
+});
 
 describe("the SQLite store", () => {
   let dir: string;
@@ -117,5 +126,34 @@ describe("the SQLite store", () => {
     opened.close();
 
     expect(existsSync(parent)).toBe(true);
+  });
+
+  describe("excerpts", () => {
+    it("reads back what was written, a gone row with a null excerpt", async () => {
+      await store.writeExcerpt(kept());
+      await store.writeExcerpt(kept({ jobId: 2, status: "gone", excerpt: null }));
+
+      expect(await store.readExcerpts(REPO)).toEqual([
+        kept(),
+        kept({ jobId: 2, status: "gone", excerpt: null }),
+      ]);
+      expect(await store.excerptJobIds(REPO)).toEqual([1, 2]);
+    });
+
+    it("replaces the row of a job written again", async () => {
+      await store.writeExcerpt(kept({ status: "gone", excerpt: null }));
+      await store.writeExcerpt(kept({ excerpt: "second" }));
+
+      expect(await store.readExcerpts(REPO)).toEqual([kept({ excerpt: "second" })]);
+    });
+
+    it("keeps one repo's excerpts apart from another's", async () => {
+      await store.writeExcerpt(kept());
+      await store.writeExcerpt(kept({ repo: OTHER }));
+
+      expect(await store.excerptJobIds(OTHER)).toEqual([1]);
+      expect((await store.readExcerpts(OTHER)).map((row) => row.repo)).toEqual([OTHER]);
+      expect(await store.excerptJobIds("madangryscientist/none")).toEqual([]);
+    });
   });
 });

@@ -6,13 +6,12 @@ import {
   type FetchLike,
   type JobRecord,
 } from "../src/index.ts";
-import { API, REPO, fakeGitHub, realRoutes, since, type Reply } from "./github-fake.ts";
+import { API, REPO, fakeGitHub, logPath, realRoutes, since, type Reply } from "./github-fake.ts";
 
 const BLOB_PATH = "https://productionresultssa12.blob.core.windows.net/actions-results/log.txt";
 const BLOB = `${BLOB_PATH}?sig=SECRET`;
 const TOKEN = "ghp_test_token";
 
-const logPath = (jobId: number) => `/repos/${REPO}/actions/jobs/${jobId}/logs`;
 const logUrl = (jobId: number) => `${API}${logPath(jobId)}`;
 
 const apiDown: FetchLike = async () => {

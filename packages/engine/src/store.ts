@@ -11,6 +11,20 @@ export interface HeldAttempt {
   runAttempt: number;
 }
 
+/** What the store keeps of one failed job's log: the excerpt and the link to the full log, never the log. */
+export interface JobExcerpt {
+  /** Lower case, as the jobs table holds it. */
+  repo: string;
+  /** GitHub job ids are unique across attempts. */
+  jobId: number;
+  /** The job's page (`JobRecord.url`): the link to the full log. */
+  url: string;
+  /** `gone` is a log the provider no longer serves. */
+  status: "kept" | "gone";
+  /** The redacted excerpt when kept, null when gone. */
+  excerpt: string | null;
+}
+
 export interface Store {
   /** Stores the records. A record whose job is already held replaces that job's row. */
   writeJobs(records: JobRecord[]): Promise<void>;
@@ -21,4 +35,10 @@ export interface Store {
   heldAttempts(repo: string): Promise<HeldAttempt[]>;
   /** Every job the store holds for `repo`, as written. */
   readJobs(repo: string): Promise<JobRecord[]>;
+  /** Stores the excerpt. It replaces any row for that job. */
+  writeExcerpt(excerpt: JobExcerpt): Promise<void>;
+  /** The id of every job of `repo` with an excerpt row, kept or gone. */
+  excerptJobIds(repo: string): Promise<number[]>;
+  /** Every excerpt row of `repo`. */
+  readExcerpts(repo: string): Promise<JobExcerpt[]>;
 }

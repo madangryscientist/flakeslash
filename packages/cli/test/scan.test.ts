@@ -6,6 +6,7 @@ import {
   jobsOf,
   jobsPath,
   json,
+  logPath,
   pullsPath,
   realRoutes,
   run,
@@ -15,13 +16,22 @@ import {
 } from "../../engine/test/github-fake.ts";
 import { SINCE, useScan } from "./scan-harness.ts";
 
+/** The four failed jobs of the real run: attempt 2 first, as a scan reads them (newest run, then attempt). */
+const REAL_FAILED = [126063284092, 126063283282, 126058067053, 126057955448];
+
+/** A 404 for each job's log: the log does not matter to the test, and a 404 is stored as expired. */
+const expiredLogs = (...jobIds: number[]) =>
+  Object.fromEntries(jobIds.map((id) => [logPath(id), json({}, { status: 404 })]));
+
+const realRoutesWithLogs = () => ({ ...realRoutes(), ...expiredLogs(...REAL_FAILED) });
+
 const JOB_URL = `https://github.com/${REPO}/actions/runs/41676366416/job/`;
 
 describe("flakeslash scan: the summary", () => {
   const scan = useScan();
 
   it("lists each flake with its evidence URLs, as text and as --json", async () => {
-    const gh = fakeGitHub(realRoutes());
+    const gh = fakeGitHub(realRoutesWithLogs());
 
     const first = await scan.exec(["scan", REPO, "--since", SINCE, "--json"], gh);
     expect(first.code).toBe(0);
@@ -67,7 +77,7 @@ describe("flakeslash scan: the second scan", () => {
   const scan = useScan();
 
   it("adds no rows and fetches no finished attempt again, not even a pull request", async () => {
-    const gh = fakeGitHub(realRoutes());
+    const gh = fakeGitHub(realRoutesWithLogs());
     await scan.exec(["scan", REPO, "--since", SINCE], gh);
     const before = await scan.rows();
     expect(before).toHaveLength(12);
@@ -81,7 +91,7 @@ describe("flakeslash scan: the second scan", () => {
   });
 
   it("treats Owner/Repo and owner/repo as one repo", async () => {
-    const gh = fakeGitHub(realRoutes());
+    const gh = fakeGitHub(realRoutesWithLogs());
     await scan.exec(["scan", "Madangryscientist/PixelSlash", "--since", SINCE], gh);
     const before = await scan.rows();
     expect(before).toHaveLength(12);
@@ -98,6 +108,7 @@ describe("flakeslash scan: the second scan", () => {
       [runsPath()]: runsOf(run(7, "2026-11-04T00:00:00Z", { conclusion: "failure" })),
       [pullsPath(shaOf(7))]: json([]),
       [jobsPath(7, 1)]: jobsOf(job(71, 7, { conclusion: "failure" })),
+      ...expiredLogs(71),
     });
     const first = await scan.exec(["scan", REPO, "--since", SINCE, "--json"], gh);
     expect(JSON.parse(first.out).repos[0].flakes).toEqual([]);
@@ -127,9 +138,10 @@ describe("flakeslash scan: the second scan", () => {
       ),
       [pullsPath(shaOf(8))]: json([]),
       [jobsPath(8, 1)]: jobsOf(job(81, 8, { conclusion: "failure" })),
+      ...expiredLogs(81),
     });
     await scan.exec(["scan", REPO, "--since", SINCE], gh);
-    expect(gh.paths).toEqual([runsPath(), pullsPath(shaOf(8)), jobsPath(8, 1)]);
+    expect(gh.paths).toEqual([runsPath(), pullsPath(shaOf(8)), jobsPath(8, 1), logPath(81)]);
     expect((await scan.rows()).map((r) => r.runAttempt)).toEqual([1]);
 
     gh.routes[runsPath()] = runsOf(run(8, "2026-11-04T00:00:00Z", { run_attempt: 2 }));

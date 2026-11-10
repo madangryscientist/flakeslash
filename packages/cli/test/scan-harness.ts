@@ -57,6 +57,15 @@ export function useScan() {
         vi.restoreAllMocks();
       }
     },
+    /** Every excerpt row the store holds for `repo`. */
+    async excerpts(repo = REPO) {
+      const store = openSqliteStore(storePath());
+      try {
+        return await store.readExcerpts(repo);
+      } finally {
+        store.close();
+      }
+    },
     /** Every job row the store holds for `repo`. */
     async rows(repo = REPO) {
       const store = openSqliteStore(storePath());
