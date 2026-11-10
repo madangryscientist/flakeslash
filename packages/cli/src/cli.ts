@@ -20,7 +20,9 @@ Usage:
 scan reads each repo's GitHub Actions history (no pipeline change) and keeps it in a local SQLite
 store, so a second scan fetches only what is new. For each failed job it also reads the log once,
 cuts it down to the lines around the failure, removes secrets, and keeps that excerpt with a link to
-the full log. The whole log is never stored. The token comes from GITHUB_TOKEN.
+the full log. The whole log is never stored. Each failure is then grouped into an issue (the same
+crash with other ports or times is one issue; known crashes are named by kind), with no model.
+The token comes from GITHUB_TOKEN.
 
 Options for scan:
   --since <date>   read runs created on or after this date (default: 90 days ago)
@@ -90,6 +92,7 @@ function summarize(scan: RepoScan): string {
   if (scan.logsLeft > 0) {
     lines.push(`  ${scan.logsLeft} logs left for the next scan (GitHub said try later)`);
   }
+  lines.push(`  new failures: ${scan.newFailures} in ${scan.issuesTouched} issues`);
   if (scan.flakes.length === 0) lines.push("  no flaky jobs");
   else lines.push(`  ${scan.flakes.length} flaky ${scan.flakes.length === 1 ? "job" : "jobs"}:`);
   for (const flake of scan.flakes) {

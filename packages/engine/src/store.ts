@@ -3,6 +3,7 @@
  * already holds. The engine only sees this interface. The CLI implements it on a local SQLite file and
  * the server will implement it over D1, so nothing here may depend on a runtime's own modules.
  */
+import type { Failure, Issue } from "./catalogue.ts";
 import type { JobRecord } from "./providers/github-actions.ts";
 
 /** One attempt of one run that the store holds with every job finished (no job has a null conclusion). */
@@ -41,4 +42,14 @@ export interface Store {
   excerptJobIds(repo: string): Promise<number[]>;
   /** Every excerpt row of `repo`. */
   readExcerpts(repo: string): Promise<JobExcerpt[]>;
+  /** Every issue, across repos. Issues are not per repo. */
+  readIssues(): Promise<Issue[]>;
+  /** Stores the issue. It replaces the row with that id. */
+  writeIssue(issue: Issue): Promise<void>;
+  /** Stores the failures. A failure with the same repo, job and signature replaces its row. */
+  writeFailures(failures: Failure[]): Promise<void>;
+  /** The id of every job of `repo` that has at least one failure. */
+  failureJobIds(repo: string): Promise<number[]>;
+  /** Every failure, across repos. */
+  readFailures(): Promise<Failure[]>;
 }

@@ -6,6 +6,7 @@
 import { Database, type SQLQueryBindings } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { CATALOGUE_SCHEMA, catalogueStore } from "./catalogue-store.ts";
 import {
   isRunner,
   type HeldAttempt,
@@ -53,6 +54,7 @@ CREATE TABLE IF NOT EXISTS excerpts (
   excerpt TEXT,
   PRIMARY KEY (repo, job_id)
 );
+${CATALOGUE_SCHEMA}
 `;
 
 const COLUMNS = `provider, repo, run_id, run_attempt, job_id, workflow, job_name, url, commit_sha,
@@ -212,6 +214,7 @@ export function openSqliteStore(path: string = DEFAULT_STORE_PATH): SqliteStore 
         excerpt: row.excerpt,
       }));
     },
+    ...catalogueStore(db),
     close(): void {
       db.close();
     },
