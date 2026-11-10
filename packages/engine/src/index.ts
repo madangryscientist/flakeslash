@@ -27,6 +27,8 @@ export {
 
 export { findJobFlakes, type JobFlake } from "./flakes.ts";
 
+export { cleanLog, cutLog } from "./excerpt.ts";
+
 export { isRunner } from "./providers/github-runner.ts";
 
 export { GitHubApiError } from "./providers/github-api.ts";

@@ -1,0 +1,269 @@
+…
+[WebServer]       - "ratelimits" exists at the top level, but not on "env.e2e".
+[WebServer]         This is not what you probably want, since "ratelimits" is not inherited by environments.
+[WebServer]         Please add "ratelimits" to "env.e2e".
+[WebServer] 
+[WebServer] 
+
+Running 38 tests using 1 worker
+
+  ✘   1 [chromium] › e2e/action-row.spec.ts:42:1 › the action row keeps its place as j walks shots with short and long titles (1.2s)
+  ✘   2 [chromium] › e2e/ai-review.spec.ts:20:1 › an opted-in project's model auto-passes a noise-only shot and says why (1.2s)
+  ✘   3 [chromium] › e2e/ai-review.spec.ts:76:1 › a build with 10 changed shots gets no summary, says why, and offers no Regenerate (1.3s)
+  ✘   4 [chromium] › e2e/ai-review.spec.ts:110:1 › with no model a changed shot is reviewed as plain pixels (1.3s)
+  ✘   5 [chromium] › e2e/ai-review.spec.ts:134:1 › a project without its own model uses the org's, and its own overrides it (1.3s)
+  ✘   6 [chromium] › e2e/brief.spec.ts:28:1 › a brief is shown as text, and the summary reads the build against it (1.2s)
+  ✘   7 [chromium] › e2e/composition.spec.ts:30:1 › one gap and one special case are listed and drawn on the branch shot (1.2s)
+[WebServer] ▲ [WARNING] Processing dist/server/wrangler.json configuration:
+[WebServer] 
+[WebServer]     - No environment found in configuration with name "e2e".
+[WebServer]       Before using `--env=e2e` there should be an equivalent environment section in the configuration.
+[WebServer]   
+[WebServer]       Consider adding an environment configuration section to the wrangler.json file:
+[WebServer]       ```
+[WebServer]       [env.e2e]
+[WebServer]       ```
+[WebServer]   
+[WebServer] 
+[WebServer] 
+  ✘   8 [chromium] › e2e/composition.spec.ts:98:1 › a new shot, which nothing measured, still has its boxes, placed on the image's own size (1.2s)
+  ✓   9 [chromium] › e2e/deep-history.spec.ts:91:1 › a branch finds the main build CI skipped for 55 commits (6.4s)
+  ✓  10 [chromium] › e2e/diff-overrides.spec.ts:11:1 › an override set on the snapshot screen flips the verdict and exports as config (4.8s)
+  ✓  11 [chromium] › e2e/flakes.spec.ts:11:1 › a flaky shot under each policy: badge, summary line, config line, resolve and reopen (4.4s)
+  ✓  12 [chromium] › e2e/google-sign-in.spec.ts:8:1 › sign in with Google, then with GitHub as the same email, and stay one user (1.5s)
+  ✓  13 [chromium] › e2e/ignore-boxes.spec.ts:28:1 › a box drawn over the change flips the verdict, exports as config, and stays in its org (12.0s)
+  ✓  14 [chromium] › e2e/metrics.spec.ts:27:1 › a diffed build states its wall time, counts and compare time, and the branch its window (2.6s)
+  ✓  15 [chromium] › e2e/metrics.spec.ts:69:1 › a build older than the timings says so, and invents no zero (5.7s)
+  ✓  16 [chromium] › e2e/org-tokens.spec.ts:4:1 › mint an org token in the org settings, see it is live, revoke it (1.7s)
+  ✓  17 [chromium] › e2e/orgs.spec.ts:4:1 › an empty org says what a project is, and a pending invite can be withdrawn (2.3s)
+  ✓  18 [chromium] › e2e/rerun.spec.ts:11:1 › an errored shot is re-run from the build page, and the build gets its verdict (6.5s)
+  ✓  19 [chromium] › e2e/review.spec.ts:196:1 › the review screens: j/k walk, overlay from stored regions, accept, reject, accept all (17.8s)
+  ✓  20 [chromium] › e2e/review.spec.ts:300:1 › the branch page: against main, since last build, and an accept the build page agrees with (5.6s)
+  ✓  21 [chromium] › e2e/review.spec.ts:330:1 › a decision moves the reviewer on: accept advances, a failed decision stays put (4.6s)
+  ✓  22 [chromium] › e2e/review.spec.ts:361:1 › re-deciding a shot: a rejection goes to the build page (4.4s)
+  -  23 [chromium] › e2e/rss-burst.spec.ts:110:1 › workerd RSS across a burst of 0 full-page shots
+  ✓  24 [chromium] › e2e/sentry.spec.ts:18:1 › a browser error reaches Sentry with release and environment, and no cookie, token or image (792ms)
+  ✓  25 [chromium] › e2e/sign-in.spec.ts:9:1 › sign in with GitHub, create a project and issue a CI token (2.3s)
+  ✓  26 [chromium] › e2e/slider.spec.ts:9:1 › Details and Tools start shut; the slider draws both shots at one scale, drags on the image and takes the keyboard (3.7s)
+service core:user:pixelslash-web: Uncaught Error: refusing to start: GITHUB_OAUTH_BASE is http://localhost:4174 and GITHUB_API_BASE is http://localhost:4174, but a production build signs in only through https://github.com and https://api.github.com. Another base is the e2e GitHub stand-in, which lets anyone sign in as anyone; it is for a dev server or the test build (CLOUDFLARE_ENV=e2e bun run build) only.
+  at index.js:16401:20
+  ✓  27 [chromium] › e2e/stub-refusal.spec.ts:121:3 › a production build and the GitHub stand-in › pointed at the stand-in, it does not start, and says why (385ms)
+  ✓  28 [chromium] › e2e/stub-refusal.spec.ts:127:3 › a production build and the GitHub stand-in › pointed at GitHub, the same build starts; with no Google client, no Google sign-in (353ms)
+  ✓  29 [chromium] › e2e/theme.spec.ts:6:3 › a visitor who follows the system and has chosen nothing › reaches dark with no cookie (221ms)
+  ✓  30 [chromium] › e2e/theme.spec.ts:16:3 › a light system › starts light, and an explicit choice survives a reload with the class server-rendered (438ms)
+  ✓  31 [chromium] › e2e/theme.spec.ts:44:1 › an explicit light choice beats a dark system (355ms)
+  ✓  32 [chromium] › e2e/timings.spec.ts:19:1 › a diffed build shows its server timings, and the org's Timings tab their p50 and max (2.7s)
+  ✓  33 [chromium] › e2e/timings.spec.ts:62:1 › with no build the Timings tab says so, not a row of dashes (2.2s)
+…
+  ✓  35 [chromium] › e2e/upload.spec.ts:141:1 › the CLI uploads a snapshot dir; rows and R2 objects land under the right org (11.9s)
+  ✓  36 [chromium] › e2e/upload.spec.ts:230:1 › a dir of loose PNGs goes through `import` and `upload`, and the server diffs it (3.9s)
+  ✓  37 [chromium] › e2e/upload.spec.ts:266:1 › a project switched to CI diffs in the CLI: the server stores what it measured (ob 1727) (3.9s)
+  ✓  38 [chromium] › e2e/user-tokens.spec.ts:3:1 › issue a personal token in settings, see it once, use it, revoke it (901ms)
+
+
+  1) [chromium] › e2e/action-row.spec.ts:42:1 › the action row keeps its place as j walks shots with short and long titles 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:45549/
+    Call log:
+      - navigating to "http://localhost:45549/", waiting until "load"
+
+
+       at api-upload.ts:23
+
+      21 | /** Sign in, make an org and a project, and issue a CI token; returns it and the project id. */
+      22 | export async function provision(page: Page, org = "Flake Co", project = "flaky") {
+    > 23 |   await page.goto("/");
+         |              ^
+      24 |   await page.getByRole("link", { name: "Sign in with GitHub" }).click();
+      25 |   await expect(page).toHaveURL(/\/orgs$/);
+      26 |   await createOrg(page, org);
+        at provision (/home/runner/work/pixelslash/pixelslash/apps/web/e2e/api-upload.ts:23:14)
+        at /home/runner/work/pixelslash/pixelslash/apps/web/e2e/action-row.spec.ts:47:38
+
+    Error Context: test-results/action-row-the-action-row--0cd93--with-short-and-long-titles-chromium/error-context.md
+
+  2) [chromium] › e2e/ai-review.spec.ts:20:1 › an opted-in project's model auto-passes a noise-only shot and says why 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:45549/
+    Call log:
+      - navigating to "http://localhost:45549/", waiting until "load"
+
+
+       at api-upload.ts:23
+
+      21 | /** Sign in, make an org and a project, and issue a CI token; returns it and the project id. */
+      22 | export async function provision(page: Page, org = "Flake Co", project = "flaky") {
+    > 23 |   await page.goto("/");
+         |              ^
+      24 |   await page.getByRole("link", { name: "Sign in with GitHub" }).click();
+      25 |   await expect(page).toHaveURL(/\/orgs$/);
+      26 |   await createOrg(page, org);
+        at provision (/home/runner/work/pixelslash/pixelslash/apps/web/e2e/api-upload.ts:23:14)
+        at /home/runner/work/pixelslash/pixelslash/apps/web/e2e/ai-review.spec.ts:21:38
+
+    Error Context: test-results/ai-review-an-opted-in-proj-58e31-oise-only-shot-and-says-why-chromium/error-context.md
+
+  3) [chromium] › e2e/ai-review.spec.ts:76:1 › a build with 10 changed shots gets no summary, says why, and offers no Regenerate 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:45549/
+    Call log:
+      - navigating to "http://localhost:45549/", waiting until "load"
+
+
+       at api-upload.ts:23
+
+      21 | /** Sign in, make an org and a project, and issue a CI token; returns it and the project id. */
+      22 | export async function provision(page: Page, org = "Flake Co", project = "flaky") {
+    > 23 |   await page.goto("/");
+         |              ^
+      24 |   await page.getByRole("link", { name: "Sign in with GitHub" }).click();
+      25 |   await expect(page).toHaveURL(/\/orgs$/);
+      26 |   await createOrg(page, org);
+        at provision (/home/runner/work/pixelslash/pixelslash/apps/web/e2e/api-upload.ts:23:14)
+        at /home/runner/work/pixelslash/pixelslash/apps/web/e2e/ai-review.spec.ts:79:38
+
+    Error Context: test-results/ai-review-a-build-with-10--d25d9-hy-and-offers-no-Regenerate-chromium/error-context.md
+
+  4) [chromium] › e2e/ai-review.spec.ts:110:1 › with no model a changed shot is reviewed as plain pixels 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:45549/
+    Call log:
+      - navigating to "http://localhost:45549/", waiting until "load"
+
+
+       at api-upload.ts:23
+
+      21 | /** Sign in, make an org and a project, and issue a CI token; returns it and the project id. */
+      22 | export async function provision(page: Page, org = "Flake Co", project = "flaky") {
+    > 23 |   await page.goto("/");
+         |              ^
+      24 |   await page.getByRole("link", { name: "Sign in with GitHub" }).click();
+      25 |   await expect(page).toHaveURL(/\/orgs$/);
+      26 |   await createOrg(page, org);
+        at provision (/home/runner/work/pixelslash/pixelslash/apps/web/e2e/api-upload.ts:23:14)
+        at /home/runner/work/pixelslash/pixelslash/apps/web/e2e/ai-review.spec.ts:111:38
+
+    Error Context: test-results/ai-review-with-no-model-a--01afa-is-reviewed-as-plain-pixels-chromium/error-context.md
+
+  5) [chromium] › e2e/ai-review.spec.ts:134:1 › a project without its own model uses the org's, and its own overrides it 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:45549/
+    Call log:
+      - navigating to "http://localhost:45549/", waiting until "load"
+
+
+       at api-upload.ts:23
+
+      21 | /** Sign in, make an org and a project, and issue a CI token; returns it and the project id. */
+      22 | export async function provision(page: Page, org = "Flake Co", project = "flaky") {
+    > 23 |   await page.goto("/");
+         |              ^
+      24 |   await page.getByRole("link", { name: "Sign in with GitHub" }).click();
+      25 |   await expect(page).toHaveURL(/\/orgs$/);
+      26 |   await createOrg(page, org);
+        at provision (/home/runner/work/pixelslash/pixelslash/apps/web/e2e/api-upload.ts:23:14)
+        at /home/runner/work/pixelslash/pixelslash/apps/web/e2e/ai-review.spec.ts:137:38
+
+    Error Context: test-results/ai-review-a-project-withou-fd121--s-and-its-own-overrides-it-chromium/error-context.md
+
+  6) [chromium] › e2e/brief.spec.ts:28:1 › a brief is shown as text, and the summary reads the build against it 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:45549/
+    Call log:
+      - navigating to "http://localhost:45549/", waiting until "load"
+
+
+       at api-upload.ts:23
+
+      21 | /** Sign in, make an org and a project, and issue a CI token; returns it and the project id. */
+      22 | export async function provision(page: Page, org = "Flake Co", project = "flaky") {
+    > 23 |   await page.goto("/");
+         |              ^
+      24 |   await page.getByRole("link", { name: "Sign in with GitHub" }).click();
+      25 |   await expect(page).toHaveURL(/\/orgs$/);
+      26 |   await createOrg(page, org);
+        at provision (/home/runner/work/pixelslash/pixelslash/apps/web/e2e/api-upload.ts:23:14)
+        at /home/runner/work/pixelslash/pixelslash/apps/web/e2e/brief.spec.ts:29:38
+
+    Error Context: test-results/brief-a-brief-is-shown-as--519ce--reads-the-build-against-it-chromium/error-context.md
+
+  7) [chromium] › e2e/composition.spec.ts:30:1 › one gap and one special case are listed and drawn on the branch shot 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:45549/
+    Call log:
+      - navigating to "http://localhost:45549/", waiting until "load"
+
+
+       at api-upload.ts:23
+
+      21 | /** Sign in, make an org and a project, and issue a CI token; returns it and the project id. */
+      22 | export async function provision(page: Page, org = "Flake Co", project = "flaky") {
+    > 23 |   await page.goto("/");
+         |              ^
+      24 |   await page.getByRole("link", { name: "Sign in with GitHub" }).click();
+      25 |   await expect(page).toHaveURL(/\/orgs$/);
+      26 |   await createOrg(page, org);
+        at provision (/home/runner/work/pixelslash/pixelslash/apps/web/e2e/api-upload.ts:23:14)
+        at /home/runner/work/pixelslash/pixelslash/apps/web/e2e/composition.spec.ts:31:38
+
+    Error Context: test-results/composition-one-gap-and-on-4fac2-nd-drawn-on-the-branch-shot-chromium/error-context.md
+
+  8) [chromium] › e2e/composition.spec.ts:98:1 › a new shot, which nothing measured, still has its boxes, placed on the image's own size 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:45549/
+    Call log:
+      - navigating to "http://localhost:45549/", waiting until "load"
+
+
+       at api-upload.ts:23
+
+      21 | /** Sign in, make an org and a project, and issue a CI token; returns it and the project id. */
+      22 | export async function provision(page: Page, org = "Flake Co", project = "flaky") {
+    > 23 |   await page.goto("/");
+         |              ^
+      24 |   await page.getByRole("link", { name: "Sign in with GitHub" }).click();
+      25 |   await expect(page).toHaveURL(/\/orgs$/);
+      26 |   await createOrg(page, org);
+        at provision (/home/runner/work/pixelslash/pixelslash/apps/web/e2e/api-upload.ts:23:14)
+        at /home/runner/work/pixelslash/pixelslash/apps/web/e2e/composition.spec.ts:101:38
+
+    Error Context: test-results/composition-a-new-shot-whi-d966d-ced-on-the-image-s-own-size-chromium/error-context.md
+
+  8 failed
+    [chromium] › e2e/action-row.spec.ts:42:1 › the action row keeps its place as j walks shots with short and long titles 
+    [chromium] › e2e/ai-review.spec.ts:20:1 › an opted-in project's model auto-passes a noise-only shot and says why 
+    [chromium] › e2e/ai-review.spec.ts:76:1 › a build with 10 changed shots gets no summary, says why, and offers no Regenerate 
+    [chromium] › e2e/ai-review.spec.ts:110:1 › with no model a changed shot is reviewed as plain pixels 
+    [chromium] › e2e/ai-review.spec.ts:134:1 › a project without its own model uses the org's, and its own overrides it 
+    [chromium] › e2e/brief.spec.ts:28:1 › a brief is shown as text, and the summary reads the build against it 
+    [chromium] › e2e/composition.spec.ts:30:1 › one gap and one special case are listed and drawn on the branch shot 
+    [chromium] › e2e/composition.spec.ts:98:1 › a new shot, which nothing measured, still has its boxes, placed on the image's own size 
+  1 skipped
+  29 passed (2.5m)
+Warning: command "playwright test" exited with non-zero status code
+
+ NX   Running target test:e2e for project web failed
+
+
+Failed tasks:
+
+- web:test:e2e
+
+Hint: run the command with --verbose for more details.
+
+  Run duration:      2m 33s
+  Critical path:     2m 33s (1 task)
+  Recoverable time:  <1ms
+
+  Recommendations:
+    - Speed up or split the longest tasks on the critical path:
+        web:test:e2e    2m 33s
+##[error]Process completed with exit code 1.
+Post job cleanup.
+[command]/usr/bin/git version
+git version 2.56.0
+Temporarily overriding HOME='/home/runner/work/_temp/0345b3ee-3b0f-43ff-96ae-f9c0185b7ef2' before making global git config changes
+Adding repository directory to the temporary git global config as a safe directory
+[command]/usr/bin/git config --global --add safe.directory /home/runner/work/pixelslash/pixelslash
+Removing SSH command configuration
+[command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
