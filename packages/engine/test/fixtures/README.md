@@ -27,6 +27,9 @@ committed file is the excerpt the engine would keep. Each is 1 KB to 17 KB.
 - `126034000055`: pixelslash, an npm publish with only the generic exit line.
 - `122931680354`: hackcove, a step where the process was stopped by SIGTERM (an annotation, no test).
   This is the nearest real thing to a runner that died.
+- `127767586349`: pixelslash, a Playwright test named `a page that crashes is captured once more in a
+  fresh context`, failing on `the page crashed during goto` (lower case). It must match no starter
+  signature.
 
 The tests in `excerpt.test.ts` wrap each fixture in generated passing steps and cut that whole log. A
 fixture is already an excerpt, so these tests cannot show the rule on a full raw log: the planner runs

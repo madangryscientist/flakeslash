@@ -1,0 +1,176 @@
+…
+   ✓ regions (20)
+     ✓ shift regions (9)
+       ✓ a text block shifted half a pixel is a shift, and the run is not changed 354ms
+       ✓ one button moved 1px away from its neighbour is a change 396ms
+       ✓ an ignore box drops the pixels before any shift is fitted: no region, not labelled 386ms
+ ✓ test/diff.test.ts (21 tests) 56ms
+ ✓ test/storybook.test.ts (14 tests) 6358ms
+   ✓ captureSnapshots with a storybook (4)
+     ✓ shoots every story × globals × variant, with the theme applied 2701ms
+     ✓ hand-written routes and stories coexist; the storybook is the base when nothing else is 1181ms
+     ✓ a story that errors fails the capture by name, with Storybook's message 491ms
+     ✓ a story that never renders fails the capture by name inside the timeout 1841ms
+ ✓ test/upload.test.ts (21 tests) 3252ms
+   ✓ gitContext (6)
+     ✓ commit, branch, merge-base with the base branch and nearest-first ancestors 400ms
+     ✓ the ancestors are the merge-base's first-parent history, up to 200 705ms
+     ✓ with no merge-base, HEAD's own 20 nearest parents 604ms
+   ✓ uploadSnapshots (7)
+     ✓ nothing is sent when the manifest is bad or the server is not a URL 360ms
+ ✓ test/config.test.ts (45 tests) 45ms
+…
+ ✓ test/flake-upload.test.ts (10 tests) 6120ms
+   ✓ a changed shot is captured again, and a flaky one says so (ob 1737) (10)
+     ✓ only changed shots are re-captured, each the default 2 more times, one at a time 965ms
+     ✓ every shot sends its resolved policy, flaky or not 346ms
+     ✓ a server project's local diff decides the retries and is never sent 795ms
+     ✓ a CI project sends its diff results as before, and the record beside them 1244ms
+     ✓ 0 retries captures each shot once and writes no report 1614ms
+     ✓ the local report names the flaky shot, its runs and its policy 326ms
+     ✓ a re-capture that fails is said, and the shot goes up as captured 326ms
+ ✓ test/dev-feature.test.ts (6 tests) 260ms
+ ✓ test/parity.test.ts (17 tests) 61ms
+ ❯ test/capture-crash.test.ts (7 tests | 1 failed) 16660ms
+   ❯ a page that crashes is captured once more in a fresh context (7)
+     ✓ goto: one crash, the retry's PNG, a warning that names the step 2025ms
+     ✓ the crash event alone counts, whatever the error says 3396ms
+     ✓ settle and screenshot are named too 3232ms
+     ✓ a second crash fails with a CaptureError, and there is no third attempt 469ms
+     ✓ a timeout is not retried 1045ms
+     ✓ an HTTP 500 is not retried 413ms
+     × real Chromium: a renderer killed mid-load is retried and the retry's PNG is kept 6071ms
+ ✓ test/browsers.test.ts (12 tests | 4 skipped) 4638ms
+   ✓ a real chromium (2)
+     ✓ captures a page, fingerprints itself, and writes the same bytes twice 2564ms
+     ✓ fails a page that never settles, inside the timeout 1947ms
+ ✓ test/metrics-entry.test.ts (34 tests) 85ms
+ ✓ test/story-crop.test.ts (13 tests) 17105ms
+   ✓ a Storybook shot is cropped to the story (10)
+     ✓ a small story is its own box plus 8 CSS px, not the viewport 1334ms
+     ✓ at device scale 2 the crop is the same box in image px 2045ms
+     ✓ a visible element portalled into <body> is in the crop; a hidden one is not 4332ms
+     ✓ a portal that fades in is measured where the shot shows it 1334ms
+     ✓ the crop is clipped to the page 1306ms
+…
+   ✓ similarity (12)
+     ✓ the same screen at 1x and 3x scores 1: each is read at its own scale 536ms
+     ✓ it is symmetric 351ms
+   ✓ similarityOfPngs (3)
+     ✓ scores two stored shots at their own scales 469ms
+ ✓ test/dev-feature-review.test.ts (5 tests) 279ms
+ ✓ test/setup.test.ts (5 tests) 4559ms
+   ✓ setup (5)
+     ✓ without one, a page behind sign-in fails the capture 579ms
+     ✓ signs in through a form once, every shot gets the session, and no secret is written 1898ms
+     ✓ reuses a saved session: cookies from a file named in env 1339ms
+     ✓ a setup that throws fails the capture by its path; one with no function is a usage error 714ms
+ ✓ test/upload-retry.test.ts (7 tests) 1444ms
+ ✓ test/upload-ci.test.ts (4 tests) 381ms
+ ✓ test/composition-gaps.test.ts (4 tests) 52ms
+ ✓ test/a11y-entry.test.ts (20 tests) 49ms
+ ✓ test/composition-capture.test.ts (5 tests) 2875ms
+   ✓ a composition-only capture (3)
+     ✓ writes each shot's findings to the manifest, and the gap list beside it 1488ms
+     ✓ any other project's manifest has no composition and no gap list 1351ms
+…
+ ✓ test/sentry-scrub.test.ts (4 tests) 16ms
+ ✓ test/compare-snapshots.test.ts (2 tests) 29ms
+ ✓ test/capture-concurrency.test.ts (2 tests) 164ms
+ ✓ test/config-storybook.test.ts (8 tests) 24ms
+ ✓ test/capture.test.ts (3 tests) 65ms
+ ✓ test/config-flake.test.ts (8 tests) 43ms
+ ✓ test/start.test.ts (2 tests) 599ms
+   ✓ startApp (2)
+     ✓ a start command that exited is an error even when the URL answers 565ms
+ ✓ test/fingerprint.test.ts (3 tests) 20ms
+ ✓ test/diff-module.test.ts (3 tests) 66ms
+ ✓ test/route-names.test.ts (4 tests) 19ms
+ ✓ test/release.test.ts (3 tests) 29ms
+ ✓ test/unmatched.test.ts (1 test) 8ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/capture-crash.test.ts > a page that crashes is captured once more in a fresh context > real Chromium: a renderer killed mid-load is retried and the retry's PNG is kept
+AssertionError: expected Error: capture failed for http://127.0.0.… to be undefined
+
+- Expected:
+undefined
+
++ Received:
+CaptureError {
+  "message": "capture failed for http://127.0.0.1:37125/slow: goto: Timeout 4000ms exceeded.
+Call log:
+  - navigating to \"http://127.0.0.1:37125/slow\", waiting until \"domcontentloaded\"
+",
+}
+
+ ❯ test/capture-crash.test.ts:248:21
+    246|       };
+    247|       const { warnings, rgb, error } = await run("/slow", 4_000);
+    248|       expect(error).toBeUndefined();
+       |                     ^
+    249|       expect(warnings.filter((w) => /crashed/.test(w))).toEqual([
+    250|         "warning: slow (desktop): the page crashed during goto; captur…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 52 passed (53)
+      Tests  1 failed | 660 passed | 4 skipped (665)
+   Start at  07:21:01
+   Duration  69.40s (tests 86%, import 12%, transform 2%)
+
+
+##[error]AssertionError: expected Error: capture failed for http://127.0.0.… to be undefined
+
+- Expected:
+undefined
+
++ Received:
+CaptureError {
+  "message": "capture failed for http://127.0.0.1:37125/slow: goto: Timeout 4000ms exceeded.
+Call log:
+  - navigating to \"http://127.0.0.1:37125/slow\", waiting until \"domcontentloaded\"
+",
+}
+
+ ❯ test/capture-crash.test.ts:248:21
+
+
+error: "vitest" exited with code 1
+Warning: command "bun --bun vitest run" exited with non-zero status code
+##[endgroup]
+✔  nx run playwright:test
+✔  nx run bench:test
+✔  nx run site:test
+✔  nx run web:test
+
+
+
+ NX   Running target test for 7 projects and 6 tasks they depend on failed
+
+Failed tasks:
+
+- engine:test
+
+Output of 12 successful tasks were not shown. Run with --verbose or --output-style=static to see it.
+
+  Run duration:      2m 2s
+  Cache:             4/12 hit (33%)
+  Critical path:     1m 38s (1 task)
+  Recoverable time:  23.7s (19% of the run)
+
+  Recommendations:
+    - Speed up or split the longest tasks on the critical path:
+        web:test    1m 38s
+error: script "test" exited with code 1
+##[error]Process completed with exit code 1.
+Post job cleanup.
+[command]/usr/bin/git version
+git version 2.56.0
+Temporarily overriding HOME='/home/runner/work/_temp/bbcfb049-9857-42bf-b107-703711c6e3a2' before making global git config changes
+Adding repository directory to the temporary git global config as a safe directory
+[command]/usr/bin/git config --global --add safe.directory /home/runner/work/pixelslash/pixelslash
+Removing SSH command configuration
+[command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
