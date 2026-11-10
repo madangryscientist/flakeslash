@@ -33,6 +33,15 @@ export { cleanLog, cutLog } from "./excerpt.ts";
 
 export { redact } from "./redact.ts";
 
+export {
+  createModelClient,
+  type ModelClient,
+  type ModelClientOptions,
+  type ModelFetch,
+  type ModelMessage,
+  type ModelResult,
+} from "./model.ts";
+
 export { isRunner } from "./providers/github-runner.ts";
 
 export { GitHubApiError } from "./providers/github-api.ts";
