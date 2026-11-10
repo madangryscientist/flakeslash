@@ -38,3 +38,11 @@ export { GitHubApiError } from "./providers/github-api.ts";
 export { scanRepo, type RepoScan } from "./pipeline.ts";
 
 export { signatures, type FailureSignature, type SignatureJob } from "./signature.ts";
+
+export {
+  KINDS,
+  STARTER_SIGNATURES,
+  matchStarter,
+  type Kind,
+  type LiteralPattern,
+} from "./starter-signatures.ts";
