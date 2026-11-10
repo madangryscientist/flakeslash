@@ -1,3 +1,4 @@
+import { Database } from "bun:sqlite";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -154,6 +155,27 @@ describe("the SQLite store", () => {
       expect(await store.excerptJobIds(OTHER)).toEqual([1]);
       expect((await store.readExcerpts(OTHER)).map((row) => row.repo)).toEqual([OTHER]);
       expect(await store.excerptJobIds("madangryscientist/none")).toEqual([]);
+    });
+  });
+
+  describe("issues and failures", () => {
+    it("opens a store file from before these tables and adds them", async () => {
+      const path = join(dir, "old.db");
+      const old = new Database(path, { create: true });
+      old.exec(
+        "CREATE TABLE excerpts (repo TEXT NOT NULL, job_id INTEGER NOT NULL, url TEXT NOT NULL, status TEXT NOT NULL, excerpt TEXT, PRIMARY KEY (repo, job_id))",
+      );
+      old.exec("INSERT INTO excerpts VALUES ('r/x', 1, 'u', 'kept', 'e')");
+      old.close();
+
+      const opened = openSqliteStore(path);
+      try {
+        expect(await opened.readIssues()).toEqual([]);
+        expect(await opened.readFailures()).toEqual([]);
+        expect(await opened.excerptJobIds("r/x")).toEqual([1]);
+      } finally {
+        opened.close();
+      }
     });
   });
 });

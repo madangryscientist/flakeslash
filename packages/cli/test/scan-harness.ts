@@ -66,6 +66,24 @@ export function useScan() {
         store.close();
       }
     },
+    /** Every issue the store holds, across repos. */
+    async issues() {
+      const store = openSqliteStore(storePath());
+      try {
+        return await store.readIssues();
+      } finally {
+        store.close();
+      }
+    },
+    /** Every failure the store holds, across repos. */
+    async failures() {
+      const store = openSqliteStore(storePath());
+      try {
+        return await store.readFailures();
+      } finally {
+        store.close();
+      }
+    },
     /** Every job row the store holds for `repo`. */
     async rows(repo = REPO) {
       const store = openSqliteStore(storePath());
