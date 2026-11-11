@@ -251,3 +251,69 @@ describe("signatures: real jobs", () => {
     expect(only(text, { ...JOB, workflow: "release" }).signature).not.toBe(a.signature);
   });
 });
+
+/** One bun file block: a timed-out test, a passing test, then bun's summary repeat of the failure. */
+const BUN_TIMEOUT = [
+  "##[group]test/cache.test.ts:",
+  "✓ cache > reuses a fresh copy [2907.90ms]",
+  "✗ cache > re-pulls a stale copy [5305.18ms]",
+  "  ^ this test timed out after 5000ms.",
+  "✓ cache > surfaces a pull error [141.47ms]",
+  "##[endgroup]",
+  "",
+  "1 tests failed:",
+  "✗ cache > re-pulls a stale copy [5305.18ms]",
+  "  ^ this test timed out after 5000ms.",
+].join("\n");
+
+describe("signatures: bun test output", () => {
+  it("gives one failure for a timed-out test and its summary repeat, named by file and title", () => {
+    const entry = only(BUN_TIMEOUT);
+    expect(entry).toMatchObject({
+      file: "test/cache.test.ts",
+      title: "cache > re-pulls a stale copy",
+      location: "test/cache.test.ts",
+      errorLine: "this test timed out after 5000ms.",
+    });
+  });
+
+  it("takes the error line from the assertion above a bare file header's failed line", () => {
+    const entry = only(
+      [
+        "test/parse.test.ts:",
+        "error: expect(received).toBe(expected)",
+        "",
+        "Expected: 3",
+        "Received: 2",
+        "",
+        "(fail) parse > counts the rows [12.00ms]",
+      ].join("\n"),
+    );
+    expect(entry).toMatchObject({
+      file: "test/parse.test.ts",
+      title: "parse > counts the rows",
+      errorLine: "error: expect(received).toBe(expected)",
+    });
+  });
+
+  it("gives the same signature to the same bun failure with other durations", () => {
+    const a = only("test/parse.test.ts:\n(fail) parse > counts the rows [12.00ms]\n");
+    const b = only("test/parse.test.ts:\n(fail) parse > counts the rows | 14 ms\n");
+    expect(a.title).toBe("parse > counts the rows");
+    expect(b.title).toBe("parse > counts the rows");
+    expect(a.signature).toBe(b.signature);
+  });
+
+  it("merges five bun tests that time out on one note into one entry with no test", () => {
+    const text = [
+      "##[group]test/many.test.ts:",
+      ...[1, 2, 3, 4, 5]
+        .map((n) => [`✗ many > test ${n} [5000.00ms]`, "  ^ this test timed out after 5000ms."])
+        .flat(),
+      "##[endgroup]",
+    ].join("\n");
+    const entry = only(text);
+    expect(entry.file).toBeNull();
+    expect(entry.errorLine).toBe("this test timed out after 5000ms.");
+  });
+});
