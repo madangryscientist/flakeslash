@@ -279,7 +279,8 @@ async function scanAll(
         ...options.model,
         fetch: deps.modelFetch ?? globalThis.fetch,
       });
-      explanations.result = await explainIssues({ store, client, model: options.model.model });
+      const explain = { store, client, model: options.model.model, repos: options.repos };
+      explanations.result = await explainIssues(explain);
     }
   } finally {
     store.close();

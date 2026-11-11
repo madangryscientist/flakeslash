@@ -26,6 +26,7 @@ flakeslash scan owner/repo \
 ```
 
 - Only the redacted excerpt of a failed job is sent, with the workflow and job name. Never a whole log.
+- A model run sends only excerpts of the repos named on that command. An issue whose only excerpts are in other repos is left for a scan that names them.
 - The cap is a hard stop. At the cap the scan still exits 0 and the summary says how many issues were explained and how many were not. A failed call also exits 0; the summary gives the count and the first error.
 - Explanations never change which jobs are reported as flaky. Only passing and failing runs decide that.
 - A pattern is kept only if it matches the text that later logs are matched on, in the issue's own failures. Otherwise the explanation is kept and the pattern is dropped.
