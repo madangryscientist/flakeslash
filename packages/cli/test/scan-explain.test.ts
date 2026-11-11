@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { REPO, fakeGitHub } from "../../engine/test/github-fake.ts";
 import { openSqliteStore } from "../src/store.ts";
 import { MODEL_ARGS, SCAN, echo, err, log, reply, stub } from "./model-stub.ts";
-import { SINCE, routesOf, useScan } from "./scan-harness.ts";
+import { SINCE, playwrightLog, routesOf, text, useScan } from "./scan-harness.ts";
 
 const compare = (a: number | string, b: number | string): number => {
   if (a === b) return 0;
@@ -11,6 +11,10 @@ const compare = (a: number | string, b: number | string): number => {
 };
 
 const OTHER = "madangryscientist/hackcove";
+
+/** The same failing test in both repos, with a marker line the excerpt carries but the error line does not. */
+const same = (marker: string) =>
+  text(playwrightLog(["uploads", `Error: ship link never appeared\n    ${marker}`]));
 
 const never: ModelFetch = async () => {
   throw new Error("a model call went out");
@@ -86,6 +90,56 @@ describe("flakeslash scan: explanations", () => {
     expect(await scan.issues()).toHaveLength(1);
     expect(new Set((await scan.failures()).map((failure) => failure.issueId)).size).toBe(1);
     expect(await scan.failures()).toHaveLength(2);
+  });
+
+  it("sends a model only the excerpts of the repos the scan names", async () => {
+    const gh = fakeGitHub(
+      routesOf(
+        [REPO, 1, log(err("uploads", "Error: ship api refused: from the named repo"))],
+        [OTHER, 2, log(err("publishes", "Error: ship api refused: from the other repo"))],
+      ),
+    );
+    await scan.exec(["scan", REPO, OTHER, "--since", SINCE], gh, env);
+
+    const model = stub(echo);
+    const result = await withModel(gh, model.fetch);
+    expect(result.code).toBe(0);
+    expect(model.seen).toHaveLength(1);
+    for (const body of model.seen) {
+      const sent = JSON.stringify(body);
+      expect(sent).toContain("from the named repo");
+      expect(sent).not.toContain("from the other repo");
+    }
+    expect(result.out).toContain("1 explained");
+
+    const issues = await scan.issues();
+    const named = issues.find((issue) => issue.explanation !== null);
+    const other = issues.find((issue) => issue.explanation === null);
+    expect(named?.explanation?.repo).toBe(REPO);
+    expect(other).toBeDefined();
+    expect(result.out).toContain("0 with no excerpt");
+  });
+
+  it("explains a cross-repo issue from the named repo's excerpt, not the newer one in another repo", async () => {
+    const gh = fakeGitHub(
+      routesOf(
+        [REPO, 1, same("excerpt from the named repo")],
+        [OTHER, 2, same("excerpt from the other repo")],
+      ),
+    );
+    await scan.exec(["scan", REPO, OTHER, "--since", SINCE], gh, env);
+    expect(await scan.issues()).toHaveLength(1);
+
+    const model = stub(echo);
+    const result = await withModel(gh, model.fetch);
+    expect(result.code).toBe(0);
+    expect(model.seen).toHaveLength(1);
+    const sent = JSON.stringify(model.seen[0]);
+    expect(sent).toContain("excerpt from the named repo");
+    expect(sent).not.toContain("excerpt from the other repo");
+    const [issue] = await scan.issues();
+    expect(issue?.explanation?.repo).toBe(REPO);
+    expect(result.out).toContain("1 explained");
   });
 
   it("makes no call for a known crash", async () => {

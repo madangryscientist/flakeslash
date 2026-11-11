@@ -44,6 +44,8 @@ export interface ExplainOptions {
   client: ModelClient;
   /** The model name that was asked for; kept on each explanation. */
   model: string;
+  /** The repos this scan names, owner/name. Only their excerpts are ever sent to the model. */
+  repos: string[];
 }
 
 interface RepoRows {
@@ -60,12 +62,17 @@ interface Run {
   failed: Set<string>;
   /** Issues with no kept excerpt that was never sent. */
   noExcerpt: Set<string>;
+  /** Repos this scan names, lower case. */
+  named: Set<string>;
   issues: Map<string, Issue>;
   failuresOf: Map<string, Failure[]>;
   /** `repo:jobId` of every job a reply was already given for. */
   asked: Set<string>;
   repoRows: Map<string, RepoRows>;
 }
+
+/** Which repos an excerpt may come from: the ones this scan names, or any the store holds. */
+type Scope = "named" | "any";
 
 interface Picked {
   job: JobRecord;
@@ -92,6 +99,7 @@ function sameSignature(a: Issue["signatures"][number], b: Issue["signatures"][nu
 
 async function loadRun(options: ExplainOptions): Promise<Run> {
   const { store } = options;
+  const named = new Set(options.repos.map((repo) => repo.toLowerCase()));
   const failuresOf = new Map<string, Failure[]>();
   for (const failure of await store.readFailures()) {
     failuresOf.set(failure.issueId, [...(failuresOf.get(failure.issueId) ?? []), failure]);
@@ -102,6 +110,7 @@ async function loadRun(options: ExplainOptions): Promise<Run> {
     result: newResult(),
     failed: new Set(),
     noExcerpt: new Set(),
+    named,
     issues: new Map((await store.readIssues()).map((issue) => [issue.id, issue])),
     failuresOf,
     asked: new Set((await store.readModelCalls()).map((call) => `${call.repo}:${call.jobId}`)),
@@ -120,12 +129,16 @@ async function rowsOf(run: Run, repo: string): Promise<RepoRows> {
   return rows;
 }
 
-/** The issue's newest failed job with a kept excerpt that was never sent. */
-async function pickJob(run: Run, issue: Issue): Promise<Picked | null> {
+/**
+ * The issue's newest failed job with a kept excerpt that was never sent. Under "named" only a repo
+ * this scan names is looked at, so no other repo's excerpt is ever chosen to go to the model.
+ */
+async function pickJob(run: Run, issue: Issue, scope: Scope): Promise<Picked | null> {
   const failures = (run.failuresOf.get(issue.id) ?? []).toSorted(
     (a, b) => b.jobId - a.jobId || byCodePoint(a.repo, b.repo),
   );
   for (const failure of failures) {
+    if (scope === "named" && !run.named.has(failure.repo)) continue;
     if (run.asked.has(`${failure.repo}:${failure.jobId}`)) continue;
     const rows = await rowsOf(run, failure.repo);
     const held = rows.excerpts.get(failure.jobId);
@@ -265,9 +278,9 @@ async function explainOne(run: Run, candidates: Issue[], at: number): Promise<bo
   const issue = candidates[at];
   // A pattern from an earlier reply may have merged this issue away.
   if (issue === undefined || run.issues.get(issue.id) !== issue) return true;
-  const picked = await pickJob(run, issue);
+  const picked = await pickJob(run, issue, "named");
   if (picked === null) {
-    run.noExcerpt.add(issue.id);
+    await leftOut(run, issue);
     return true;
   }
   const reply = await run.options.client.complete(userMessage(picked), { maxTokens: MAX_TOKENS });
@@ -294,14 +307,24 @@ async function explainOne(run: Run, candidates: Issue[], at: number): Promise<bo
   return true;
 }
 
+/**
+ * An issue with no excerpt in the named repos. If another repo holds one, it is left for a later
+ * scan that names that repo and counted nowhere; if no repo holds one, it is `noExcerpt`.
+ */
+async function leftOut(run: Run, issue: Issue): Promise<void> {
+  if ((await pickJob(run, issue, "any")) === null) run.noExcerpt.add(issue.id);
+}
+
 /** Everything still unexplained when a call is refused for good counts under `reason`. */
 async function refuseRest(run: Run, rest: Issue[], reason: "cap" | "stopped"): Promise<void> {
   for (const issue of rest) {
     if (run.issues.get(issue.id) !== issue || issue.explanation !== null) continue;
-    if (run.noExcerpt.has(issue.id) || (await pickJob(run, issue)) === null) {
-      run.noExcerpt.add(issue.id);
-    } else {
+    if (run.noExcerpt.has(issue.id)) continue;
+    const picked = await pickJob(run, issue, "named");
+    if (picked !== null) {
       run.result.notExplained[reason] += 1;
+    } else {
+      await leftOut(run, issue);
     }
   }
 }
