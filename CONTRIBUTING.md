@@ -4,7 +4,7 @@ Thanks for helping. This page is the short version of [`AGENTS.md`](AGENTS.md), 
 agreement for people and coding agents working here. Read it before a large change.
 
 By taking part you agree to the [Code of Conduct](CODE_OF_CONDUCT.md). A security problem goes to
-[`SECURITY.md`](SECURITY.md), not to a public issue. Your contribution is licensed under MIT, as the
+[`SECURITY.md`](SECURITY.md), not to a public issue. Your contribution is licensed under the Elastic License 2.0, as the
 rest of the repo is (see [`LICENSE`](LICENSE)); there is no CLA.
 
 ## Start with an issue

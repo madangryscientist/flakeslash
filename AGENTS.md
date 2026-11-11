@@ -1,6 +1,6 @@
 # FlakeSlash: repo conventions
 
-FlakeSlash is an open source tool for finding flaky tests: detect them in an engine, work with them
+FlakeSlash is a source-available tool for finding flaky tests: detect them in an engine, work with them
 from a CLI and a hosted dashboard. No product domain is chosen yet, so nothing is routed anywhere.
 
 **This repository is a skeleton.** It has the structure, the gate and the CI, and no product
