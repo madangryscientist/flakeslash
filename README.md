@@ -1,6 +1,6 @@
 # FlakeSlash
 
-Open source flaky-test detection you can run yourself. MIT licensed.
+Source-available flaky-test detection you can run yourself, under the Elastic License 2.0.
 
 > **Status: skeleton.** The repo has its structure, gate and CI, and no product features yet.
 
@@ -28,4 +28,4 @@ send a change. [`docs/`](docs) has the testing policy and the getting-started pa
 
 ## Licence
 
-MIT, see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
+Elastic License 2.0, see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE). FlakeSlash is a name of Jacobus Langner; the licence does not grant it.

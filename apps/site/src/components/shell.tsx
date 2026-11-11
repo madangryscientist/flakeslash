@@ -15,7 +15,7 @@ function Footer(): ReactNode {
   return (
     <Stack gap="sm" data-testid="footer">
       <Cluster gap="md">
-        <span>MIT licence</span>
+        <span>Elastic License 2.0</span>
         <TextLink href={REPO_URL} external data-testid="source-link">
           GitHub
         </TextLink>

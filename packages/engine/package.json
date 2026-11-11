@@ -2,7 +2,7 @@
   "name": "@hackcove/flakeslash-engine",
   "version": "0.0.0",
   "private": true,
-  "license": "MIT",
+  "license": "Elastic-2.0",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"

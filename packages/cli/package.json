@@ -7,7 +7,7 @@
     "flaky-tests",
     "test-reliability"
   ],
-  "license": "MIT",
+  "license": "Elastic-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/madangryscientist/flakeslash.git",

@@ -19,7 +19,8 @@ export const Route = createRootRoute({
       { title: "FlakeSlash: flaky-test detection you can self-host" },
       {
         name: "description",
-        content: "FlakeSlash is an open source flaky-test detection tool. MIT, self-hostable.",
+        content:
+          "FlakeSlash is a source-available flaky-test detection tool under the Elastic License 2.0, self-hostable.",
       },
     ],
     links: [{ rel: "stylesheet", href: appCss }],
