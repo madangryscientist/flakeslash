@@ -182,3 +182,66 @@ describe("cutLog", () => {
     expect(out.startsWith("##[group]Run build\n")).toBe(true);
   });
 });
+
+describe("cutLog does not keep a pass as a failure", () => {
+  it("keeps the failing test in a log of 2,000 passing tests named after failures", () => {
+    const passing = Array.from(
+      { length: 2_000 },
+      (_, i) => `  ✓ renderT3Status (${i}) > a failed health stage with an error ${i}`,
+    );
+    const step = [
+      "##[group]Run bun test",
+      ...passing,
+      "  0 pass",
+      "  0 fail",
+      "  (fail) renderT3Status > the health check gives up | 3 ms",
+      "error: expected 200 to equal 503",
+      "  at renderT3Status (health.test.ts:12:5)",
+      "##[error]Process completed with exit code 1.",
+    ].join("\n");
+
+    const out = cutLog(step);
+
+    expect(out).toContain("(fail) renderT3Status > the health check gives up");
+    expect(out).toContain("error: expected 200 to equal 503");
+    expect(out.length).toBeLessThanOrEqual(25_000);
+  });
+
+  it("does not match a summary line whose only failure count is zero", () => {
+    const rows = Array.from({ length: 300 }, (_, i) => `row ${i}  0 fail | 0 errors`);
+    const step = ["##[group]Run tests", ...rows, "##[error]boom"].join("\n");
+
+    const out = cutLog(step);
+
+    expect(out).toContain("row 299  0 fail | 0 errors");
+    expect(out).not.toContain("row 100  0 fail");
+  });
+
+  it("still matches a summary line with a real failure count next to a zero", () => {
+    const log = [
+      "##[group]Run tests",
+      ...Array.from({ length: 30 }, (_, i) => `filler ${i}`),
+      "Tests  1 failed | 0 errors",
+      ...Array.from({ length: 30 }, (_, i) => `after ${i}`),
+    ].join("\n");
+
+    const out = cutLog(log);
+
+    expect(out).toContain("Tests  1 failed | 0 errors");
+    expect(out).toContain("filler 29");
+  });
+
+  it("does not match a passing line written with the plain reporter", () => {
+    const log = [
+      "##[group]Run bun test",
+      "(pass) renderT3Status > a failed health stage | 1 ms",
+      ...Array.from({ length: 20 }, (_, i) => `quiet line ${i}`),
+      "##[error]Process completed with exit code 1.",
+    ].join("\n");
+
+    const out = cutLog(log);
+
+    expect(out).not.toContain("(pass) renderT3Status");
+    expect(out).toContain("##[error]Process completed with exit code 1.");
+  });
+});
