@@ -101,9 +101,17 @@ function splitSteps(lines: string[]): string[][] {
   return steps;
 }
 
+/** A line that reports a pass: a `✓` or `✔` mark, or bun's plain `(pass)` reporter, first in the line. */
+const PASS_LINE = /^\s*(?:✓|✔|\(pass\))/;
+
+/** A zero failure or error count, such as bun's ` 0 fail` summary. It says nothing failed. */
+const ZERO_COUNT = /\b0 (?:fail|failed|failures|errors?)\b/gi;
+
 function isMatch(line: string): boolean {
-  const lower = line.toLowerCase();
-  return KEYWORDS.some((keyword) => lower.includes(keyword)) || EXIT_CODE.test(line);
+  if (PASS_LINE.test(line)) return false;
+  const counted = line.replace(ZERO_COUNT, "");
+  const lower = counted.toLowerCase();
+  return KEYWORDS.some((keyword) => lower.includes(keyword)) || EXIT_CODE.test(counted);
 }
 
 /** The lines of one step within `CONTEXT` of a match, in order, with a gap marked wherever lines were dropped. */
