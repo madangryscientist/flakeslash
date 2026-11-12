@@ -178,7 +178,7 @@ function readBunLine(cursor: Cursor, line: string): boolean {
     cursor.current = undefined;
     return true;
   }
-  if (line.startsWith("##[endgroup]")) cursor.bunFile = undefined;
+  if (line.startsWith("##[endgroup]") || line === "…") cursor.bunFile = undefined;
   cursor.bunError = BUN_ERROR.exec(line)?.[1] ?? cursor.bunError;
   return false;
 }
@@ -208,6 +208,25 @@ function findTests(lines: string[]): TestFailure[] {
     }
   }
   return [...cursor.found.values()];
+}
+
+/** The `Failed tasks:` header of Nx's summary, which lists the tasks that failed, one `- project:target` each. */
+const NX_FAILED_HEADER = /^\s*Failed tasks:\s*$/;
+
+const NX_FAILED_TASK = /^\s*-\s+(\S+:\S+)\s*$/;
+
+/** The tasks Nx lists as failed, in order and once each. Blank lines are skipped; the list ends at any other line. */
+function failedTasks(lines: string[]): string[] {
+  const at = lines.findIndex((line) => NX_FAILED_HEADER.test(line));
+  if (at === -1) return [];
+  const tasks = new Set<string>();
+  for (const line of lines.slice(at + 1)) {
+    if (line.trim() === "") continue;
+    const match = NX_FAILED_TASK.exec(line);
+    if (!match) break;
+    tasks.add(match[1] ?? "");
+  }
+  return [...tasks];
 }
 
 /** The first `##[error]` line that says something. */
@@ -245,7 +264,8 @@ function errorEntry(errorLine: string): FailureSignature {
 /**
  * One entry per failure in an excerpt. A failed test is keyed on its file, title and error line.
  * Five or more tests with one normalised error are one entry keyed on that error. A job that names
- * no test is keyed on its first real `##[error]` line, or, with none, on its repo, workflow and job.
+ * no test is keyed on its first real `##[error]` line, else on each task Nx lists as failed, else,
+ * with neither, on its repo, workflow and job.
  */
 export function signatures(excerpt: string, job: SignatureJob): FailureSignature[] {
   const lines = excerpt.split("\n");
@@ -254,6 +274,12 @@ export function signatures(excerpt: string, job: SignatureJob): FailureSignature
   if (tests.length === 0) {
     const errorLine = findErrorLine(lines);
     if (errorLine) return [errorEntry(errorLine)];
+    const tasks = failedTasks(lines);
+    if (tasks.length > 0) {
+      return tasks.map((task) =>
+        errorEntry(`nx task ${task} failed with no failed test in its output`),
+      );
+    }
     return [{ file: null, title: null, location: null, errorLine, signature: jobSignature(job) }];
   }
 
