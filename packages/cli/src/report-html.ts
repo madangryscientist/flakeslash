@@ -101,6 +101,21 @@ const STYLES = `
   --tag: #ececf4;
   --suspect: #fbe7c4;
   --suspect-fg: #6e4300;
+  --link: #3b5bdb;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17171e;
+    --fg: #e6e6ee;
+    --muted: #a0a0ae;
+    --card: #20202a;
+    --line: #34343f;
+    --code: #15151b;
+    --tag: #2c2c38;
+    --suspect: #4a3816;
+    --suspect-fg: #ffd997;
+    --link: #8ea8ff;
+  }
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; }
@@ -120,7 +135,7 @@ h2 { font-size: 1.1rem; margin: 0; overflow-wrap: anywhere; }
 .cause { margin: 0.4rem 0; overflow-wrap: anywhere; }
 .gone { color: var(--muted); font-style: italic; margin: 0; }
 pre { background: var(--code); border-radius: 0.4rem; padding: 0.7rem; margin: 0; max-height: 24rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.45 ui-monospace, monospace; }
-a { color: inherit; }
+a { color: var(--link); }
 `;
 
 /** The whole report as one HTML document. */

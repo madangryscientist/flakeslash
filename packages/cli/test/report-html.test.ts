@@ -61,4 +61,19 @@ describe("reportHtml", () => {
     expect(html).toContain("log expired");
     expect(html).toContain("50% (1 of 2 commits)");
   });
+
+  it("carries a dark colour scheme that redefines the page's colour tokens", () => {
+    const html = reportHtml({
+      ranked: [ranked],
+      excerpts: new Map(),
+      repos: ["acme/app"],
+      now: "2026-12-01T00:00:00.000Z",
+    });
+
+    expect(html).toContain("@media (prefers-color-scheme: dark)");
+    const dark = html.slice(html.indexOf("@media (prefers-color-scheme: dark)"));
+    for (const token of ["--bg:", "--fg:", "--muted:", "--line:", "--code:", "--link:"]) {
+      expect(dark).toContain(token);
+    }
+  });
 });
