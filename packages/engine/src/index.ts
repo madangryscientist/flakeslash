@@ -36,6 +36,8 @@ export {
   type TestFlake,
 } from "./flakes.ts";
 
+export { flakeRates, type FlakeRate } from "./rate.ts";
+
 export { cleanLog, cutLog } from "./excerpt.ts";
 
 export { redact } from "./redact.ts";
