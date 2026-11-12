@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import pkg from "../package.json" with { type: "json" };
 import type { FetchLike } from "@hackcove/flakeslash-engine";
-import { parseScanArgs, run } from "../src/cli.ts";
+import { run } from "../src/cli.ts";
+import { parseScanArgs } from "../src/scan-args.ts";
 
 describe("run", () => {
   it("prints the CLI package version for --version", async () => {

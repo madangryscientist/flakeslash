@@ -3,19 +3,19 @@ import {
   describeEngine,
   explainIssues,
   GitHubApiError,
-  isRepoName,
   scanRepo,
-  type FetchLike,
-  type ModelClientOptions,
-  type ModelFetch,
+  type RankedIssue,
   type RepoScan,
 } from "@hackcove/flakeslash-engine";
 import pkg from "../package.json" with { type: "json" };
+import { catalogueJson, catalogueOf, writeReportFile } from "./catalogue-output.ts";
+import type { ReportInput } from "./report-html.ts";
 import { summarizeExplanations, type Explanations } from "./explanations.ts";
+import { suspectLines } from "./suspect-lines.ts";
 import { ISSUE_HELP, ISSUE_USAGE, issueCommand } from "./issue.ts";
 import { nameScans, testText } from "./flake-tests.ts";
+import { parseScanArgs, type Deps, type ScanArgs } from "./scan-args.ts";
 import { openSqliteStore } from "./store.ts";
-import { suspectLines } from "./suspect-lines.ts";
 import { UsageError } from "./usage-error.ts";
 
 const HELP = `flakeslash: flaky-test detection from the terminal.
@@ -32,7 +32,8 @@ store, so a second scan fetches only what is new. For each failed job it also re
 cuts it down to the lines around the failure, removes secrets, and keeps that excerpt with a link to
 the full log. The whole log is never stored. Each failure is then grouped into an issue (the same
 crash with other ports or times is one issue; known crashes are named by kind), with no model.
-The token comes from GITHUB_TOKEN.
+The token comes from GITHUB_TOKEN. When every repo is scanned, scan also writes report.html next to the
+store: the issues ranked by commits in the last 30 days, each with its flake rate, PRs and log excerpt.
 
 scan explains the failures no known signature recognises, with your own OpenAI-compatible endpoint.
 With no endpoint named, nothing is sent anywhere and the summary says explanations are off. Naming
@@ -43,7 +44,7 @@ the cap. One redacted excerpt is sent per unexplained issue (never the log), so 
 Options for scan:
   --since <date>   read runs created on or after this date (default: 90 days ago)
   --store <path>   the SQLite file (default: .flakeslash/flakeslash.db)
-  --json           write { "repos": [...], "explanations": ... } to stdout instead of the summary
+  --json           write { "repos", "explanations", "catalogue" } to stdout instead of the summary
   --model-url <url>   the endpoint's base URL, http or https (or FLAKESLASH_MODEL_URL)
   --model <name>      the model to ask for (needed with --model-url)
   --cap-usd <n>       the most to spend, in USD, above 0 (needed with --model-url)
@@ -58,149 +59,6 @@ Environment for scan:
 ${ISSUE_HELP}
 Exit codes: 0 ok, 1 the run failed (an outage, a refused token), 2 a usage error.
 `;
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-const DEFAULT_SINCE_DAYS = 90;
-
-/** What the CLI reaches outside itself through, so a test can stand in for the network and the shell. */
-interface Deps {
-  fetch: FetchLike;
-  /** The model endpoint's POST; the real `fetch` unless a test stands in. */
-  modelFetch?: ModelFetch;
-  env: Readonly<Record<string, string | undefined>>;
-}
-
-/** The model endpoint a scan may call: everything `createModelClient` needs but the fetch. */
-export type ModelConfig = Omit<ModelClientOptions, "fetch">;
-
-export interface ScanArgs {
-  repos: string[];
-  since: string;
-  store: string | undefined;
-  json: boolean;
-  /** Undefined when no endpoint is named. */
-  model: ModelConfig | undefined;
-}
-
-/** The model flags that mean nothing without an endpoint, in the order they are checked. */
-const MODEL_FLAGS: readonly string[] = ["--model", "--cap-usd", "--price-in", "--price-out"];
-/** Every scan flag that takes a value. */
-const VALUE_FLAGS: readonly string[] = ["--since", "--store", "--model-url", ...MODEL_FLAGS];
-
-function sinceFrom(since: string | undefined): string {
-  if (since === undefined) return new Date(Date.now() - DEFAULT_SINCE_DAYS * DAY_MS).toISOString();
-  const ms = Date.parse(since);
-  if (Number.isNaN(ms)) throw new UsageError(`--since "${since}" is not a date`);
-  return new Date(ms).toISOString();
-}
-
-/** A number flag's value, which must be finite and pass `allowed` (described by `rule`). */
-function numberFlag(
-  values: ReadonlyMap<string, string>,
-  flag: string,
-  allowed: (n: number) => boolean,
-  rule: string,
-): number {
-  const value = values.get(flag) ?? "";
-  const number = value.trim() === "" ? Number.NaN : Number(value);
-  if (!Number.isFinite(number)) throw new UsageError(`${flag} "${value}" is not a number`);
-  if (!allowed(number)) throw new UsageError(`${flag} "${value}" must be ${rule}`);
-  return number;
-}
-
-function urlFrom(value: string): string {
-  let protocol: string;
-  try {
-    protocol = new URL(value).protocol;
-  } catch {
-    throw new UsageError("--model-url is not a URL");
-  }
-  if (protocol !== "http:" && protocol !== "https:") {
-    throw new UsageError("--model-url must start with http:// or https://");
-  }
-  return value;
-}
-
-/** `Name: value` per line. A bad line is named by its number only: its text may hold a secret. */
-function headersFrom(text: string | undefined): Record<string, string> {
-  const headers: Record<string, string> = {};
-  if (text === undefined) return headers;
-  for (const [index, line] of text.split(/\r?\n/).entries()) {
-    if (line.trim() === "") continue;
-    const colon = line.indexOf(":");
-    const name = colon < 0 ? "" : line.slice(0, colon).trim();
-    if (name === "") {
-      throw new UsageError(`FLAKESLASH_MODEL_HEADERS line ${index + 1} is not "Name: value"`);
-    }
-    headers[name] = line.slice(colon + 1).trim();
-  }
-  return headers;
-}
-
-/** The endpoint named by the flag, else by FLAKESLASH_MODEL_URL; an empty value counts as unset. */
-function endpointFrom(values: ReadonlyMap<string, string>, env: Deps["env"]): string | undefined {
-  const named = values.get("--model-url") ?? env.FLAKESLASH_MODEL_URL;
-  return named === undefined || named === "" ? undefined : named;
-}
-
-function modelFrom(values: ReadonlyMap<string, string>, env: Deps["env"]): ModelConfig | undefined {
-  const url = endpointFrom(values, env);
-  if (url === undefined) {
-    const stray = MODEL_FLAGS.find((flag) => values.has(flag));
-    if (stray !== undefined) throw new UsageError(`${stray} needs --model-url`);
-    return undefined;
-  }
-  const baseUrl = urlFrom(url);
-  for (const flag of MODEL_FLAGS) {
-    if (!values.has(flag)) throw new UsageError(`${flag} is required with --model-url`);
-  }
-  return {
-    url: baseUrl,
-    key: env.FLAKESLASH_MODEL_KEY === "" ? undefined : env.FLAKESLASH_MODEL_KEY,
-    model: values.get("--model") ?? "",
-    capUsd: numberFlag(values, "--cap-usd", (n) => n > 0, "above 0"),
-    priceIn: numberFlag(values, "--price-in", (n) => n >= 0, "0 or more"),
-    priceOut: numberFlag(values, "--price-out", (n) => n >= 0, "0 or more"),
-    headers: headersFrom(env.FLAKESLASH_MODEL_HEADERS),
-    userAgent: `flakeslash/${pkg.version}`,
-  };
-}
-
-/** Splits argv into repos, the flags that take a value, and --json. */
-function readArgs(args: readonly string[]) {
-  const repos: string[] = [];
-  const values = new Map<string, string>();
-  let json = false;
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index] ?? "";
-    if (arg === "--json") json = true;
-    else if (VALUE_FLAGS.includes(arg)) {
-      const value = args[index + 1];
-      if (value === undefined || value.startsWith("--")) {
-        throw new UsageError(`${arg} needs a value`);
-      }
-      values.set(arg, value);
-      index += 1;
-    } else if (arg.startsWith("-")) throw new UsageError(`unknown option "${arg}"`);
-    else repos.push(arg);
-  }
-  return { repos, values, json };
-}
-
-export function parseScanArgs(args: readonly string[], env: Deps["env"] = {}): ScanArgs {
-  const { repos, values, json } = readArgs(args);
-  if (repos.length === 0) throw new UsageError("scan needs at least one repo, as owner/name");
-  for (const repo of repos) {
-    if (!isRepoName(repo)) throw new UsageError(`"${repo}" is not a repo; write it as owner/name`);
-  }
-  return {
-    repos,
-    since: sinceFrom(values.get("--since")),
-    store: values.get("--store"),
-    json,
-    model: modelFrom(values, env),
-  };
-}
 
 function summarize(scan: RepoScan): string {
   const lines = [scan.repo, `  new jobs: ${scan.newJobs}`];
@@ -226,14 +84,28 @@ function summarize(scan: RepoScan): string {
   return `${lines.join("\n")}\n`;
 }
 
-function report(scans: readonly RepoScan[], explanations: Explanations, json: boolean): void {
+/** What the report shows: the ranked issues (null when the scan stopped early) and the file it went to. */
+interface Output {
+  ranked: readonly RankedIssue[] | null;
+  reportPath: string | null;
+}
+
+/** Writes the summary or the JSON. */
+function report(
+  scans: readonly RepoScan[],
+  explanations: Explanations,
+  json: boolean,
+  output: Output,
+): void {
   if (json) {
+    const catalogue = output.ranked === null ? undefined : catalogueJson(output.ranked);
     process.stdout.write(
-      `${JSON.stringify({ repos: scans, explanations: explanations.result })}\n`,
+      `${JSON.stringify({ repos: scans, explanations: explanations.result, catalogue })}\n`,
     );
   } else {
+    const line = output.reportPath === null ? "" : `  report: ${output.reportPath}\n`;
     process.stdout.write(
-      `${scans.map(summarize).join("\n")}${summarizeExplanations(explanations)}`,
+      `${scans.map(summarize).join("\n")}${summarizeExplanations(explanations)}${line}`,
     );
   }
 }
@@ -255,13 +127,13 @@ function readScanArgs(
   }
 }
 
-/** Scans every repo, then (if a model is named) explains what is left. */
+/** Scans every repo, then (if a model is named) explains what is left, then ranks the issues. */
 async function scanAll(
   { options, token }: { options: ScanArgs; token: string },
   deps: Deps,
   scans: RepoScan[],
   explanations: Explanations,
-): Promise<void> {
+): Promise<ReportInput> {
   const store = openSqliteStore(options.store);
   try {
     for (const repo of options.repos) {
@@ -277,6 +149,7 @@ async function scanAll(
       explanations.result = result;
       if (result.explained > 0) await nameScans(store, scans);
     }
+    return await catalogueOf(store, options.repos, scans);
   } finally {
     store.close();
   }
@@ -308,13 +181,26 @@ async function scanCommand(args: readonly string[], deps: Deps): Promise<number>
     capUsd: options.model?.capUsd ?? 0,
   };
   let code = 0;
+  let catalogue: ReportInput | null = null;
   try {
-    await scanAll(read, deps, scans, explanations);
+    catalogue = await scanAll(read, deps, scans, explanations);
   } catch (error) {
     code = failScan(error, options, scans.length);
   }
+  // The report file is written only when every repo was scanned. A failed write is exit 1.
+  const output: Output = { ranked: catalogue?.ranked ?? null, reportPath: null };
+  if (catalogue !== null) {
+    try {
+      output.reportPath = writeReportFile(catalogue, options.store);
+    } catch (error) {
+      process.stderr.write(
+        `flakeslash: ${error instanceof Error ? error.message : String(error)}\n`,
+      );
+      code = 1;
+    }
+  }
   // Repos finished before an error are still reported.
-  report(scans, explanations, options.json);
+  report(scans, explanations, options.json, output);
   return code;
 }
 

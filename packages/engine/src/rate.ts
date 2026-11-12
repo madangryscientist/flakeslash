@@ -57,9 +57,7 @@ export function flakeRates(
   flakes: JobFlake[],
   options: { now: string; days?: number },
 ): FlakeRate[] {
-  const nowMs = Date.parse(options.now);
-  if (Number.isNaN(nowMs)) throw new RangeError(`flakeRates: now is not a time: ${options.now}`);
-  const startMs = nowMs - (options.days ?? 30) * DAY_MS;
+  const { startMs, nowMs } = windowOf(options.now, options.days);
 
   const jobs = jobsOf(records, startMs, nowMs);
   addFlakes(jobs, flakes);
@@ -97,8 +95,18 @@ function jobsOf(records: JobRecord[], startMs: number, nowMs: number): Map<strin
   return jobs;
 }
 
+/**
+ * The window `now - days * 24h < startedAt <= now` as epoch milliseconds, `days` defaulting to 30. Throws
+ * a RangeError when `now` is not a time. Every window test in the engine goes through this and `inWindow`.
+ */
+export function windowOf(now: string, days = 30): { startMs: number; nowMs: number } {
+  const nowMs = Date.parse(now);
+  if (Number.isNaN(nowMs)) throw new RangeError(`now is not a time: ${now}`);
+  return { startMs: nowMs - days * DAY_MS, nowMs };
+}
+
 /** Whether a record counts as a run in the window: it has an outcome and a start time inside the window. */
-function inWindow(record: JobRecord, startMs: number, nowMs: number): boolean {
+export function inWindow(record: JobRecord, startMs: number, nowMs: number): boolean {
   if (outcomeOf(record) === null || record.startedAt === null) return false;
   const startedMs = Date.parse(record.startedAt);
   return startedMs > startMs && startedMs <= nowMs;
