@@ -12,6 +12,7 @@ import {
   type Api,
   type FetchLike,
   type LogResult,
+  type Wait,
 } from "./github-api.ts";
 import {
   listJobs,
@@ -72,6 +73,8 @@ export interface ReadGitHubActionsOptions {
    * holds all of them.
    */
   onRecords?: (records: JobRecord[]) => Promise<void>;
+  /** Waits between retried GitHub 5xx answers. Defaults to a real timer; a test passes its own. */
+  wait?: Wait;
 }
 
 export interface ReadGitHubActionsResult {
@@ -264,7 +267,7 @@ export async function readGitHubActions(
   if (!REPO.test(options.repo)) throw new Error(`repo must look like owner/name: ${options.repo}`);
   const sinceMs = parseSince(options.since);
   const ctx: Ctx = {
-    api: createApi(options.fetch, options.token),
+    api: createApi(options.fetch, options.token, options.wait),
     repo: options.repo,
     pulls: new Map(),
     held: heldByRun(options.held ?? []),

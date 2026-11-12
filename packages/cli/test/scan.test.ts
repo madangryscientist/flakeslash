@@ -196,11 +196,11 @@ describe("flakeslash scan: usage errors exit 2 and say which", () => {
 describe("flakeslash scan: failures", () => {
   const scan = useScan();
 
-  it("a provider outage exits 1 and names the error", async () => {
-    const gh = fakeGitHub({ [runsPath()]: json({ message: "oops" }, { status: 503 }) });
+  it("a provider refusal exits 1 and names the error", async () => {
+    const gh = fakeGitHub({ [runsPath()]: json({ message: "refused" }, { status: 403 }) });
     const result = await scan.exec(["scan", REPO, "--since", SINCE], gh);
     expect(result.code).toBe(1);
-    expect(result.err).toContain("GitHub answered 503");
+    expect(result.err).toContain("GitHub answered 403");
   });
 
   it("a bad token exits 1", async () => {
@@ -210,7 +210,7 @@ describe("flakeslash scan: failures", () => {
     expect(result.err).toContain("GitHub answered 401");
   });
 
-  it("a 500 on the third run keeps the first two and the next scan fetches only the third", async () => {
+  it("a refusal on the third run keeps the first two and the next scan fetches only the third", async () => {
     const runs = runsOf(
       run(3, "2026-11-04T00:00:00Z"),
       run(2, "2026-11-03T00:00:00Z"),
@@ -223,11 +223,11 @@ describe("flakeslash scan: failures", () => {
       [pullsPath(shaOf(1))]: json([]),
       [jobsPath(3, 1)]: jobsOf(job(31, 3)),
       [jobsPath(2, 1)]: jobsOf(job(21, 2)),
-      [jobsPath(1, 1)]: json({ message: "boom" }, { status: 500 }),
+      [jobsPath(1, 1)]: json({ message: "refused" }, { status: 403 }),
     });
     const failed = await scan.exec(["scan", REPO, "--since", SINCE], gh);
     expect(failed.code).toBe(1);
-    expect(failed.err).toContain("GitHub answered 500");
+    expect(failed.err).toContain("GitHub answered 403");
     expect((await scan.rows()).map((r) => r.runId)).toEqual([2, 3]);
 
     gh.routes[jobsPath(1, 1)] = jobsOf(job(11, 1));
@@ -241,7 +241,7 @@ describe("flakeslash scan: failures", () => {
   it("still reports the repos finished before an error", async () => {
     const gh = fakeGitHub({
       [runsPath()]: runsOf(),
-      [runsPath("madangryscientist/other")]: json({}, { status: 500 }),
+      [runsPath("madangryscientist/other")]: json({}, { status: 403 }),
     });
     const result = await scan.exec(
       ["scan", REPO, "madangryscientist/other", "--since", SINCE, "--json"],
@@ -249,7 +249,7 @@ describe("flakeslash scan: failures", () => {
     );
     expect(result.code).toBe(1);
     expect(JSON.parse(result.out).repos.map((r: { repo: string }) => r.repo)).toEqual([REPO]);
-    expect(result.err).toContain("GitHub answered 500");
+    expect(result.err).toContain("GitHub answered 403");
   });
 });
 
