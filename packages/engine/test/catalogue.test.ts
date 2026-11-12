@@ -28,3 +28,58 @@ describe("catalogue: the name of an issue", () => {
     expect(issue.name).toBe("cost > acquiring a database connection");
   });
 });
+
+describe("catalogue: where a new failure goes once a person has split or merged", () => {
+  const ENTRY = {
+    file: "",
+    title: "",
+    location: "",
+    errorLine: "Error: Page crashed",
+    signature: "b".repeat(64),
+  };
+
+  it("a split issue takes the failure ahead of a starter that also matches", () => {
+    const issues = new Map<string, Issue>([
+      [
+        "split:abc",
+        {
+          id: "split:abc",
+          name: "Page crashed",
+          kind: "other",
+          status: "potential",
+          signatures: [{ type: "pattern", all: ["Page crashed"] }],
+          explanation: null,
+          edited: true,
+        },
+      ],
+    ]);
+    const { issue, created } = place(ENTRY, "Error: Page crashed", JOB, issues);
+    expect(issue.id).toBe("split:abc");
+    expect(created).toBe(false);
+    expect([...issues.keys()]).toEqual(["split:abc"]);
+  });
+
+  it("a starter failure joins the issue that holds the starter pattern, when the starter issue was merged away", () => {
+    const issues = new Map<string, Issue>([
+      [
+        "key:xyz",
+        {
+          id: "key:xyz",
+          name: "merged",
+          kind: "browser-crash",
+          status: "potential",
+          signatures: [
+            { type: "key", key: "c".repeat(64) },
+            { type: "pattern", all: ["Page crashed"] },
+          ],
+          explanation: null,
+          edited: false,
+        },
+      ],
+    ]);
+    const { issue, created } = place(ENTRY, "Error: Page crashed", JOB, issues);
+    expect(issue.id).toBe("key:xyz");
+    expect(created).toBe(false);
+    expect([...issues.keys()]).toEqual(["key:xyz"]);
+  });
+});

@@ -201,8 +201,17 @@ describe("flakeslash issue", () => {
     });
 
     it.each([
-      [[], "issue needs one of list, confirm, rename or dismiss"],
-      [["merge", "x"], 'unknown issue command "merge"'],
+      [[], "issue needs one of list, confirm, rename, dismiss, merge or split"],
+      [["frobnicate", "x"], 'unknown issue command "frobnicate"'],
+      [["merge", "key:aaaaaaaa"], "issue merge needs <id> <id>"],
+      [["merge", "key:aaaaaaaa", "key:bbbbbbbb", "key:cccccccc"], 'not "key:cccccccc"'],
+      [["split", "key:aaaaaaaa"], "issue split needs --signature <text>"],
+      [["split", "key:aaaaaaaa", "--store", "x", "--signature"], "--signature needs a value"],
+      [["split", "key:aaaaaaaa", "extra", "--signature", "x"], 'not "extra"'],
+      [
+        ["merge", "key:aaaaaaaa", "key:bbbbbbbb", "--signature", "x"],
+        'unknown option "--signature"',
+      ],
       [["confirm"], "issue confirm needs <id>"],
       [["rename", "key:aaaaaaaa"], "issue rename needs <id> <name>"],
       [["rename", "key:aaaaaaaa", "two", "words"], "(quote the name)"],

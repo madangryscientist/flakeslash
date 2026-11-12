@@ -6,7 +6,7 @@
  * join the issue with no call. Nothing here asks whether a failure is flaky: pass and fail decide
  * that, and `findJobFlakes` is not touched.
  */
-import { hasAll, matchText, type Failure, type Issue } from "./catalogue.ts";
+import { failureMatchText, hasAll, sameSignature, type Failure, type Issue } from "./catalogue.ts";
 import {
   MAX_TOKENS,
   SYSTEM_PROMPT,
@@ -15,7 +15,6 @@ import {
 } from "./explain-reply.ts";
 import type { ModelClient, ModelMessage } from "./model.ts";
 import type { JobRecord } from "./providers/github-actions.ts";
-import type { FailureSignature } from "./signature.ts";
 import type { JobExcerpt, Store } from "./store.ts";
 
 export { parseExplanation } from "./explain-reply.ts";
@@ -93,10 +92,6 @@ function isProtected(issue: Issue): boolean {
   return issue.explanation !== null || issue.edited || issue.id.startsWith("starter:");
 }
 
-function sameSignature(a: Issue["signatures"][number], b: Issue["signatures"][number]): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
-}
-
 async function loadRun(options: ExplainOptions): Promise<Run> {
   const { store } = options;
   const named = new Set(options.repos.map((repo) => repo.toLowerCase()));
@@ -152,16 +147,11 @@ async function pickJob(run: Run, issue: Issue, scope: Scope): Promise<Picked | n
 /** The text one failure is matched on, as `place` would have matched it. */
 async function textOf(run: Run, failure: Failure): Promise<string> {
   const rows = await rowsOf(run, failure.repo);
-  const job = rows.jobs.get(failure.jobId);
-  if (job === undefined) return failure.errorLine;
-  const entry: FailureSignature = {
-    file: failure.file,
-    title: failure.title,
-    location: failure.location,
-    errorLine: failure.errorLine,
-    signature: failure.signature,
-  };
-  return matchText(entry, rows.excerpts.get(failure.jobId)?.excerpt ?? "", job);
+  return failureMatchText(
+    failure,
+    rows.jobs.get(failure.jobId),
+    rows.excerpts.get(failure.jobId)?.excerpt,
+  );
 }
 
 async function issueMatches(run: Run, issue: Issue, all: readonly string[]): Promise<boolean> {

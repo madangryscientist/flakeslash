@@ -3,7 +3,9 @@ import {
   confirmIssue,
   dismissIssue,
   listIssues,
+  mergeIssues,
   renameIssue,
+  splitIssue,
   type Issue,
   type IssueStore,
   type IssueSummary,
@@ -15,23 +17,60 @@ import { UsageError } from "./usage-error.ts";
 /** How many characters of an id `issue list` shows: `key:` and 12 hex, which `findIssue` accepts. */
 const SHORT_ID = 16;
 
-type Action = "list" | "confirm" | "rename" | "dismiss";
+/** The `issue` usage lines of `flakeslash --help`. */
+export const ISSUE_USAGE = `  flakeslash issue list [--all] [--json] [--store <path>]
+                         list the issues the store holds, most failures first
+  flakeslash issue confirm|dismiss <id> [--store <path>]
+  flakeslash issue rename <id> <name> [--store <path>]
+  flakeslash issue merge <id> <id> [--store <path>]
+                         fold the second issue into the first, keeping both signatures
+  flakeslash issue split <id> --signature <text> [--store <path>]
+                         move the failures that contain the text into a new issue named by it
+`;
 
-const ACTIONS: readonly Action[] = ["list", "confirm", "rename", "dismiss"];
+/** The notes on the `issue` commands in `flakeslash --help`, after the scan notes. */
+export const ISSUE_HELP = `issue corrects one catalogue entry, and the correction survives every later scan. confirm marks the
+issue a real flake, dismiss hides it (a new failure that matches it still joins it, and it stays
+hidden), and rename sets its name (quote it; the model never renames it again). merge folds the second
+issue into the first, so new failures that match either one join the first. split moves the failures
+whose match text contains the text (the error line for a test, else the log excerpt) into a new issue,
+whose pattern is that text. <id> is the full id or any prefix of 8 or more characters that matches one
+issue; list shows the first 16 characters.
+Options for issue list:
+  --all     also show dismissed issues
+  --json    write { "issues": [...] } with full ids to stdout
+Option for issue split:
+  --signature <text>   the text to split on (required; quote it if it has spaces)
+`;
+
+type Action = "list" | "confirm" | "rename" | "dismiss" | "merge" | "split";
+
+const ACTIONS: readonly Action[] = ["list", "confirm", "rename", "dismiss", "merge", "split"];
 
 /** How many arguments after the action each one takes. */
-const OPERANDS: Record<Action, number> = { list: 0, confirm: 1, dismiss: 1, rename: 2 };
+const OPERANDS: Record<Action, number> = {
+  list: 0,
+  confirm: 1,
+  dismiss: 1,
+  rename: 2,
+  merge: 2,
+  split: 1,
+};
 const OPERAND_NAMES: Record<Action, string> = {
   list: "",
   confirm: "<id>",
   dismiss: "<id>",
   rename: "<id> <name>",
+  merge: "<id> <id>",
+  split: "<id>",
 };
 
 interface IssueArgs {
   action: Action;
-  /** The id, then the new name for `rename`. */
+  /** The ids, or the id and the new name for `rename`. */
   operands: string[];
+  /** The text `split` moves failures by. */
+  signature: string | undefined;
   store: string | undefined;
   all: boolean;
   json: boolean;
@@ -42,8 +81,8 @@ function actionOf(value: string | undefined): Action {
   if (action === undefined) {
     throw new UsageError(
       value === undefined || value.startsWith("-")
-        ? "issue needs one of list, confirm, rename or dismiss"
-        : `unknown issue command "${value}"; use list, confirm, rename or dismiss`,
+        ? "issue needs one of list, confirm, rename, dismiss, merge or split"
+        : `unknown issue command "${value}"; use list, confirm, rename, dismiss, merge or split`,
     );
   }
   return action;
@@ -53,16 +92,28 @@ interface Flags {
   store: string | undefined;
   all: boolean;
   json: boolean;
+  signature: string | undefined;
+}
+
+/** The argument after the flag at `index`. `--store` refuses a value that starts with `--`; a text may. */
+function valueAfter(args: readonly string[], index: number, flag: string): string {
+  const value = args[index + 1];
+  if (value === undefined || (flag === "--store" && value.startsWith("--"))) {
+    throw new UsageError(`${flag} needs a value`);
+  }
+  return value;
 }
 
 /** Applies the flag at `args[index]` to `flags` and returns how many arguments it used, or 0 if it is no flag. */
 function applyFlag(action: Action, args: readonly string[], index: number, flags: Flags): number {
   const arg = args[index] ?? "";
   if (arg === "--store") {
-    const value = args[index + 1];
-    if (value === undefined || value.startsWith("--"))
-      throw new UsageError("--store needs a value");
-    flags.store = value;
+    flags.store = valueAfter(args, index, arg);
+    return 2;
+  }
+  // The next argument is the text whatever it starts with, so `--signature "--- FAIL"` works.
+  if (action === "split" && arg === "--signature") {
+    flags.signature = valueAfter(args, index, arg);
     return 2;
   }
   if (action === "list" && arg === "--all") flags.all = true;
@@ -75,7 +126,7 @@ function applyFlag(action: Action, args: readonly string[], index: number, flags
 /** Splits the arguments after the action into operands and flags. `--all` and `--json` are for list. */
 function readIssueFlags(action: Action, args: readonly string[]) {
   const operands: string[] = [];
-  const flags: Flags = { store: undefined, all: false, json: false };
+  const flags: Flags = { store: undefined, all: false, json: false, signature: undefined };
   let index = 0;
   while (index < args.length) {
     const used = applyFlag(action, args, index, flags);
@@ -103,6 +154,9 @@ function parseIssueArgs(args: readonly string[]): IssueArgs {
   const action = actionOf(args[0]);
   const read = readIssueFlags(action, args.slice(1));
   checkOperands(action, read.operands);
+  if (action === "split" && read.signature === undefined) {
+    throw new UsageError("issue split needs --signature <text>");
+  }
   return { action, ...read };
 }
 
@@ -141,6 +195,18 @@ async function runAction(options: IssueArgs, store: IssueStore): Promise<void> {
     process.stdout.write(editLine("confirm", await confirmIssue(store, id)));
   } else if (options.action === "dismiss") {
     process.stdout.write(editLine("dismiss", await dismissIssue(store, id)));
+  } else if (options.action === "merge") {
+    const [, other = ""] = options.operands;
+    const { survivor, merged } = await mergeIssues(store, id, other);
+    const into = survivor.id.slice(0, SHORT_ID);
+    process.stdout.write(
+      `merged ${merged.id.slice(0, SHORT_ID)} into ${into} (${survivor.name})\n`,
+    );
+  } else if (options.action === "split") {
+    const { source, created, moved } = await splitIssue(store, id, options.signature ?? "");
+    process.stdout.write(
+      `split ${moved} failures from ${source.id.slice(0, SHORT_ID)} into ${created.id.slice(0, SHORT_ID)} (${created.name})\n`,
+    );
   } else process.stdout.write(editLine("rename", await renameIssue(store, id, name)));
 }
 
