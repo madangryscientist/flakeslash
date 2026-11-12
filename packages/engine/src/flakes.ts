@@ -17,12 +17,12 @@ export interface FlakeEvidence {
 }
 
 /**
- * A test a flake names. `name` is a label for people to read; it is never a key for counting. `source`
- * says where it came from: `log` for a location the runner printed, `junit` for a JUnit report, and
- * `model` for the component the model named.
+ * A test a flake names. `source` says where it came from: `log` for a location the runner printed, `junit`
+ * for a JUnit report, and `model` for the component the model named. A `model` name is never a key for
+ * counting; a `log` or `junit` name with its file is the test's key for rates (`rate.ts`).
  */
 export interface FlakeTest {
-  /** The test's title as the runner printed it, or the model's component. A label: never a key for counting. */
+  /** The test's title as the runner printed it, or the model's component. A label for people to read. */
   name: string;
   file: string | null;
   location: string | null;
