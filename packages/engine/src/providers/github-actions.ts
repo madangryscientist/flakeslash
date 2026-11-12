@@ -18,6 +18,7 @@ import {
   listJobs,
   listRuns,
   parseAnnotations,
+  parseCompareFiles,
   parseJob,
   parseRun,
   pickPullNumber,
@@ -316,4 +317,39 @@ export async function readJobLog(options: ReadJobLogOptions): Promise<LogResult>
   if (outcomeOf(job) !== "failed") return { status: "gone" };
   const api = createApi(options.fetch, options.token);
   return api.getLog(`${API_BASE}/repos/${job.repo}/actions/jobs/${job.jobId}/logs`);
+}
+
+/**
+ * What GitHub's compare of two commits says. `ok` lists the files that differ, as GitHub gave them (at
+ * most 300: GitHub lists no more in one compare, and this reader does not page). `missing` is a commit
+ * GitHub no longer has, or an answer with no file list. `rate-limited` is a read that did not finish.
+ */
+export type CompareResult =
+  | { status: "ok"; files: string[] }
+  | { status: "missing" }
+  | { status: "rate-limited" };
+
+export interface ReadCompareOptions {
+  /** `owner/name`. */
+  repo: string;
+  /** The older commit, as a SHA. */
+  base: string;
+  /** The newer commit, as a SHA. */
+  head: string;
+  fetch: FetchLike;
+  /** Optional, as for `readGitHubActions`. */
+  token?: string;
+}
+
+/** The files that differ between two commits: one compare call. A bad token throws. */
+export async function readCompare(options: ReadCompareOptions): Promise<CompareResult> {
+  if (!REPO.test(options.repo)) throw new Error(`repo must look like owner/name: ${options.repo}`);
+  const api = createApi(options.fetch, options.token);
+  const res = await api.get(
+    `${API_BASE}/repos/${options.repo}/compare/${options.base}...${options.head}`,
+  );
+  if (res.status === "rate-limited") return { status: "rate-limited" };
+  if (res.status === "missing") return { status: "missing" };
+  const files = parseCompareFiles(res.body);
+  return files === null ? { status: "missing" } : { status: "ok", files };
 }

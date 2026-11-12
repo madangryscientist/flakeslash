@@ -4,7 +4,7 @@
  * the server will implement it over D1, so nothing here may depend on a runtime's own modules.
  */
 import type { Failure, Issue } from "./catalogue.ts";
-import type { JobRecord } from "./providers/github-actions.ts";
+import type { CompareResult, JobRecord } from "./providers/github-actions.ts";
 
 /** One attempt of one run that the store holds with every job finished (no job has a null conclusion). */
 export interface HeldAttempt {
@@ -67,6 +67,13 @@ export interface Store {
   writeModelCall(call: ModelCall): Promise<void>;
   /** Every job ever sent to the model. */
   readModelCalls(): Promise<ModelCall[]>;
+  /** The compare stored for this pair of commits, or null when none is. */
+  readCompare(repo: string, base: string, head: string): Promise<CompareResult | null>;
+  /**
+   * Stores an `ok` or `missing` compare; it replaces any row for the pair. A `rate-limited` one is never
+   * stored, so the next scan asks again.
+   */
+  writeCompare(repo: string, base: string, head: string, result: CompareResult): Promise<void>;
   /**
    * In one transaction: stores `survivor`, points every failure (and model call) of `mergedIds` at
    * it, and deletes the merged issues. The caller has put their signatures on `survivor` already.

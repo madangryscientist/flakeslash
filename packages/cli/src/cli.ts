@@ -15,6 +15,7 @@ import { summarizeExplanations, type Explanations } from "./explanations.ts";
 import { ISSUE_HELP, ISSUE_USAGE, issueCommand } from "./issue.ts";
 import { nameScans, testText } from "./flake-tests.ts";
 import { openSqliteStore } from "./store.ts";
+import { suspectLines } from "./suspect-lines.ts";
 import { UsageError } from "./usage-error.ts";
 
 const HELP = `flakeslash: flaky-test detection from the terminal.
@@ -215,6 +216,7 @@ function summarize(scan: RepoScan): string {
     for (const test of flake.tests) lines.push(`    test: ${testText(test)}`);
     for (const item of flake.evidence) lines.push(`    ${item.outcome.padEnd(6)} ${item.url}`);
   }
+  lines.push(...suspectLines(scan.suspects));
   if (scan.cutShort) {
     lines.push(
       `  A rate limit stopped the read after ${scan.newJobs} new jobs (oldest read: ${scan.oldestRead ?? "none"}).`,
