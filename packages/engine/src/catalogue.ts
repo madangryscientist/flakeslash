@@ -84,7 +84,10 @@ export function matchText(entry: FailureSignature, excerpt: string, job: FailedJ
 }
 
 function nameOfKey(entry: FailureSignature, job: FailedJob): string {
-  if (entry.file !== null) return `${entry.location ?? entry.file}: ${entry.title ?? ""}`;
+  if (entry.file !== null) {
+    const title = entry.title ?? "";
+    return entry.location ? `${entry.location}: ${title}` : title;
+  }
   if (entry.errorLine) return entry.errorLine.slice(0, NAME_LENGTH);
   return `${job.workflow}: ${job.jobName}`;
 }
