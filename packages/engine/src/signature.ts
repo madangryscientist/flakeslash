@@ -82,6 +82,9 @@ const NORMALISE: Array<[RegExp, string]> = [
   [/\b\d{4,}\b/g, "<n>"],
 ];
 
+/** A quoted value in an error line: single, double or backtick quotes. Only a named test's key drops them. */
+const QUOTED = /'[^'\n]*'|"[^"\n]*"|`[^`\n]*`/g;
+
 function normalise(text: string): string {
   let out = text;
   for (const [pattern, replacement] of NORMALISE) out = out.replace(pattern, replacement);
@@ -92,9 +95,14 @@ function digest(...parts: string[]): string {
   return createHash("sha256").update(parts.join("\n")).digest("hex");
 }
 
-/** Keeps the three keys apart: a test, an error alone, and a job with neither. */
+/**
+ * Keeps the three keys apart: a test, an error alone, and a job with neither. For a named test,
+ * quoted values in the error line are dropped from the key, so one assertion that got two values
+ * is one test's failure, not two.
+ */
 function testSignature(file: string, title: string, errorLine: string): string {
-  return digest("test", normalise(file), title.replace(/\s+/g, " "), normalise(errorLine));
+  const shape = normalise(errorLine.replace(QUOTED, "<q>"));
+  return digest("test", normalise(file), title.replace(/\s+/g, " "), shape);
 }
 
 function errorSignature(errorLine: string): string {
