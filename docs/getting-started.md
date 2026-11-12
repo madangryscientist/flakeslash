@@ -47,11 +47,14 @@ flakeslash issue list                  # id, status, kind, failures and name, mo
 flakeslash issue confirm <id>          # you say it is a real flake
 flakeslash issue rename <id> "Ship API is down"
 flakeslash issue dismiss <id>          # hide it: not a flake, or not worth tracking
+flakeslash issue merge <id> <id>       # one issue, both signatures: the first id survives
+flakeslash issue split <id> --signature "ECONNREFUSED"  # failures containing the text get their own issue
 flakeslash issue list --all            # include dismissed issues; --json gives full ids
 ```
 
 - `list` shows the first 16 characters of each id. `<id>` is the full id or any prefix of 8 or more characters that matches exactly one issue; a prefix that matches none or several is refused (exit 2) and nothing is changed.
 - Rename and dismiss mark the issue as edited, so a model never renames or merges it. Confirm is a verdict, not an edit: a model may still explain a confirmed issue (one you also renamed or dismissed stays protected).
 - A new failure that matches a dismissed issue still joins it, and a scan never brings it back, even when one of its failures is part of a proven flake. `confirm` on a dismissed issue does.
+- Merge and split survive every later scan. A new failure that matches either merged signature joins the merged issue. A split issue takes every later failure that contains its text, in any repo, ahead of other matches. A split leaves its source in place, even with no failures left.
 - These commands read the same store as `scan` (`--store`, default `.flakeslash/flakeslash.db`) and never create one: with no store they say to run `flakeslash scan` first.
 

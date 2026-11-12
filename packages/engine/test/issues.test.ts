@@ -51,6 +51,15 @@ function memory(issues: Issue[], failures: Failure[] = []): IssueStore {
     async readFailures() {
       return failures;
     },
+    // Merge and split read and write more of the store; these edits are tested through the CLI.
+    async readJobs() {
+      return [];
+    },
+    async readExcerpts() {
+      return [];
+    },
+    async writeFailures() {},
+    async mergeIssues() {},
   };
 }
 

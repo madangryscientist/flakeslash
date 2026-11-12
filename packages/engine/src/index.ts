@@ -73,7 +73,9 @@ export {
   dismissIssue,
   findIssue,
   listIssues,
+  mergeIssues,
   renameIssue,
+  splitIssue,
   type IssueStore,
   type IssueSummary,
 } from "./issues.ts";

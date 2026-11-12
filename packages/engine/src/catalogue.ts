@@ -62,7 +62,7 @@ export interface Failure {
 }
 
 /** The job fields `place` and `failureFrom` read. They are `JobRecord`'s own. */
-interface FailedJob {
+export interface FailedJob {
   repo: string;
   workflow: string;
   jobName: string;
@@ -71,7 +71,7 @@ interface FailedJob {
   annotations: readonly { message: string }[];
 }
 
-const NAME_LENGTH = 120;
+export const NAME_LENGTH = 120;
 
 /**
  * The text an entry is matched against. An entry that names a test is matched on its own error line,
@@ -81,6 +81,36 @@ const NAME_LENGTH = 120;
 export function matchText(entry: FailureSignature, excerpt: string, job: FailedJob): string {
   if (entry.file !== null) return entry.errorLine;
   return [excerpt, ...job.annotations.map((annotation) => annotation.message)].join("\n");
+}
+
+/**
+ * The text a stored failure was matched on, as `place` matched it: rebuilt from the failure's own
+ * fields and its job's row and excerpt. `job` is undefined when the store no longer holds the job.
+ */
+export function failureMatchText(
+  failure: Failure,
+  job: FailedJob | undefined,
+  excerpt: string | null | undefined,
+): string {
+  if (job === undefined) return failure.errorLine;
+  const entry: FailureSignature = {
+    file: failure.file,
+    title: failure.title,
+    location: failure.location,
+    errorLine: failure.errorLine,
+    signature: failure.signature,
+  };
+  return matchText(entry, excerpt ?? "", job);
+}
+
+/** Two signatures are the same when they match the same way: the same type and the same strings. */
+export function sameSignature(a: IssueSignature, b: IssueSignature): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/** Whether the issue has a pattern signature that every one of its strings appears in `text`. */
+function patterned(issue: Issue, text: string): boolean {
+  return issue.signatures.some((sig) => sig.type === "pattern" && hasAll(sig.all, text));
 }
 
 function nameOfKey(entry: FailureSignature, job: FailedJob): string {
@@ -112,17 +142,28 @@ export function place(
   job: FailedJob,
   issues: Map<string, Issue>,
 ): { issue: Issue; created: boolean } {
+  const byId = [...issues.values()].toSorted(byCodePoint);
+
+  // A split is a person's pattern: it wins over everything, so a later failure with its text is never
+  // filed under the issue it was split from, or under a starter or key that also matches.
+  const split = byId.find((issue) => issue.id.startsWith("split:") && patterned(issue, text));
+  if (split) return { issue: split, created: false };
+
   const starter = matchStarter(text);
   if (starter) {
     const id = `starter:${starter.name}`;
-    const held = issues.get(id);
+    // A starter issue merged into another keeps its pattern on the survivor, so find it by that too.
+    const wanted: IssueSignature = { type: "pattern", all: starter.all };
+    const held =
+      issues.get(id) ??
+      byId.find((issue) => issue.signatures.some((sig) => sameSignature(sig, wanted)));
     if (held) return { issue: held, created: false };
     const issue: Issue = {
       id,
       name: starter.name,
       kind: starter.kind,
       status: "potential",
-      signatures: [{ type: "pattern", all: starter.all }],
+      signatures: [wanted],
       explanation: null,
       edited: false,
     };
@@ -130,11 +171,8 @@ export function place(
     return { issue, created: true };
   }
 
-  const byId = [...issues.values()].toSorted(byCodePoint);
-  const patterned = byId.find((issue) =>
-    issue.signatures.some((sig) => sig.type === "pattern" && hasAll(sig.all, text)),
-  );
-  if (patterned) return { issue: patterned, created: false };
+  const patternedIssue = byId.find((issue) => patterned(issue, text));
+  if (patternedIssue) return { issue: patternedIssue, created: false };
 
   const keyed = byId.find((issue) =>
     issue.signatures.some((sig) => sig.type === "key" && sig.key === entry.signature),
