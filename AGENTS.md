@@ -95,6 +95,8 @@ domain exists.
 3. **UI is composed from `@hackcove/ui-react`.** A custom style or component is a flag, not a fix; a
    reusable gap is filed against the hackcove repo. Keep the Catppuccin credit comment in each
    `styles.css`.
+   The local `report.html` that `flakeslash scan` writes is a self-contained file with its own inline
+   styles; it is outside this invariant, which covers `apps/` only.
 4. **A secret is read from the environment, never from the tree.** The site holds none.
 5. **Migrations are additive.** `drizzle-kit generate` writes the `.sql` and its `meta/` snapshot
    together (`bun run db:generate` in `apps/web`); never hand-write one.

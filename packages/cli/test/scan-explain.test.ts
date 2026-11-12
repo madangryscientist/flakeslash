@@ -32,7 +32,9 @@ describe("flakeslash scan: explanations", () => {
     const gh = fakeGitHub(routesOf([REPO, 1, log(err("a", "Error: ship api failed"))]));
     const result = await scan.exec(SCAN, gh, env, never);
     expect(result.code).toBe(0);
-    expect(result.out.trimEnd().endsWith("explanations: off (no model endpoint named)")).toBe(true);
+    expect(result.out).toMatch(
+      /explanations: off \(no model endpoint named\)\n {2}report: .*report\.html\n$/,
+    );
     expect((await scan.issues())[0]?.explanation).toBeNull();
 
     const asJson = await scan.exec([...SCAN, "--json"], gh, env, never);

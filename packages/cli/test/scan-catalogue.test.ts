@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { dirname, join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   REPO,
   fakeGitHub,
@@ -222,5 +223,80 @@ describe("flakeslash scan: failures grouped into issues", () => {
     const result = await scan.exec(["scan", REPO, "--since", SINCE], gh);
     expect(result.out).toContain("new failures: 0 in 0 issues");
     expect(await scan.failures()).toEqual([]);
+  });
+});
+
+describe("flakeslash scan --json: the catalogue", () => {
+  const scan = useScan();
+
+  // The fixture's jobs start on 2026-11-03 and take a minute each: the clock is fixed inside the window.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-12T00:00:00Z"));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("lists the issues in rank order, each with its rate, commits, PRs, status and suspect flag", async () => {
+    const upload = text(playwrightLog(["uploads a file", "Error: expected 1 to be 2"]));
+    const gh = fakeGitHub(
+      routesOf(
+        [REPO, 1, upload],
+        [REPO, 2, upload],
+        [REPO, 3, upload],
+        [REPO, 4, text(playwrightLog(["opens the page", "Error: other"]))],
+      ),
+    );
+    const result = await scan.exec(["scan", REPO, "--since", SINCE, "--json"], gh);
+    expect(result.code).toBe(0);
+
+    const { catalogue } = JSON.parse(result.out);
+    expect(catalogue).toEqual([
+      {
+        rank: 1,
+        id: expect.any(String),
+        name: "e2e/upload.spec.ts:141: uploads a file",
+        kind: "other",
+        status: "potential",
+        rate: 0,
+        commits: 3,
+        flakyCommits: 0,
+        ranCommits: 4,
+        minutesLost: 3,
+        prs: [],
+        suspect: false,
+      },
+      {
+        rank: 2,
+        id: expect.any(String),
+        name: "e2e/upload.spec.ts:141: opens the page",
+        kind: "other",
+        status: "potential",
+        rate: 0,
+        commits: 1,
+        flakyCommits: 0,
+        ranCommits: 4,
+        minutesLost: 1,
+        prs: [],
+        suspect: false,
+      },
+    ]);
+  });
+});
+
+describe("flakeslash scan: the report file", () => {
+  const scan = useScan();
+
+  it("writes report.html next to the store, with the ranked issue and no script", async () => {
+    const gh = fakeGitHub(
+      routesOf([REPO, 1, text(playwrightLog(["uploads a file", "Error: expected 1 to be 2"]))]),
+    );
+    const result = await scan.exec(["scan", REPO, "--since", SINCE], gh);
+    expect(result.code).toBe(0);
+
+    const html = readFileSync(join(dirname(scan.storePath()), "report.html"), "utf8");
+    expect(html).toContain("uploads a file");
+    expect(html).not.toContain("<script");
   });
 });
