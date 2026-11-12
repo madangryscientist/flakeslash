@@ -36,6 +36,24 @@ const PLAYWRIGHT_HEADER = /^\s*\d+\) (?:\[[^\]]*\] › )?(.+?):(\d+):\d+ › (.+
 /** `FAIL  test/dev.test.ts > describe > the title` in a Vitest run or its summary. */
 const VITEST_HEADER = /^\s*FAIL\s+(\S+?)(?::(\d+)(?::\d+)?)?\s+>\s+(.+?)\s*$/;
 
+/** `##[group]test/cache.test.ts:` or a bare `test/cache.test.ts:`: the file header of bun's output. */
+const BUN_FILE = /^(?:##\[group\])?(\S.*?\.(?:test|spec)\.[cm]?[jt]sx?):\s*$/;
+
+/** `✗ cache > re-pulls a stale copy [5305.18ms]`, or `(fail)` off a TTY. The duration is not the title. */
+const BUN_FAILED = /^\s*(?:✗|\(fail\))\s+(.+?)(?:\s+\[[\d.]+\s?m?s\]|\s+\|\s+[\d.]+\s?m?s)?\s*$/;
+
+/** A passing test in bun's output. It ends the error line a failed test would take. */
+const BUN_PASSED = /^\s*✓/;
+
+/** Bun's assertion error, lower case, printed above the failed line. Kept from `error:` on. */
+const BUN_ERROR = /^\s*(error:\s*.+?)\s*$/;
+
+/** The `N tests failed:` line that opens bun's summary, where each failed line repeats with no file. */
+const BUN_SUMMARY = /^\s*\d+ tests? failed:/;
+
+/** Bun's timeout note, printed with a caret under the failed line. */
+const TIMED_OUT = /^\s*\^\s*(this test timed out after [\d.]+\s?ms\.?)/;
+
 /** Where a test's block ends when no further header comes first. */
 const BLOCK_END =
   /^…$|^\s*\d+ (?:failed|flaky|skipped|did not run|passed)\b|^\s*(?:Test Files|Tests)\s|^##\[(?:group|endgroup)\]/;
@@ -107,23 +125,89 @@ function newFailure(header: { file: string; lineNo: string; title: string }): Te
   return { file, title, location: lineNo ? `${file}:${lineNo}` : file, errorLine: "" };
 }
 
-/** Finds the failed tests: Playwright's numbered blocks and Vitest's `FAIL` lines, one per test. */
+/**
+ * The bun failed line's test. Under a file header it is keyed on that file. In bun's summary, with
+ * no file, it joins the failure already found with the same title, or starts one with no file.
+ */
+function bunTest(
+  found: Map<string, TestFailure>,
+  file: string | undefined,
+  title: string,
+  error: string,
+): TestFailure {
+  const existing =
+    file === undefined
+      ? [...found.values()].find((test) => test.title === title)
+      : found.get(`${file}\n${title}`);
+  const test = existing ?? { file: file ?? "", title, location: file ?? "", errorLine: "" };
+  if (!test.errorLine) test.errorLine = error;
+  found.set(`${test.file}\n${test.title}`, test);
+  return test;
+}
+
+/** Where the scan stands: the open test, and the bun file and pending error line it reads under. */
+interface Cursor {
+  found: Map<string, TestFailure>;
+  current: TestFailure | undefined;
+  bunFile: string | undefined;
+  bunError: string;
+}
+
+/** Handles the bun lines. True when the line was one of them, so it is not read again. */
+function readBunLine(cursor: Cursor, line: string): boolean {
+  const bunHeader = BUN_FILE.exec(line);
+  if (bunHeader) {
+    cursor.bunFile = bunHeader[1];
+    cursor.bunError = "";
+    cursor.current = undefined;
+    return true;
+  }
+  const bunFailed = BUN_FAILED.exec(line);
+  if (bunFailed) {
+    cursor.current = bunTest(cursor.found, cursor.bunFile, bunFailed[1] ?? "", cursor.bunError);
+    cursor.bunError = "";
+    return true;
+  }
+  if (BUN_PASSED.test(line)) {
+    cursor.bunError = "";
+    return true;
+  }
+  if (BUN_SUMMARY.test(line)) {
+    cursor.bunFile = undefined;
+    cursor.bunError = "";
+    cursor.current = undefined;
+    return true;
+  }
+  if (line.startsWith("##[endgroup]")) cursor.bunFile = undefined;
+  cursor.bunError = BUN_ERROR.exec(line)?.[1] ?? cursor.bunError;
+  return false;
+}
+
+/** Fills the open test's error line from the first error or timed-out note that follows it. */
+function readErrorLine(current: TestFailure | undefined, line: string): void {
+  if (!current || current.errorLine) return;
+  const text = ERROR_LINE.exec(line)?.[1] ?? TIMED_OUT.exec(line)?.[1];
+  current.errorLine = text?.trim() ?? "";
+}
+
+/** Finds the failed tests: Playwright's numbered blocks, Vitest's `FAIL` lines and bun's failed lines, one per test. */
 function findTests(lines: string[]): TestFailure[] {
-  const found = new Map<string, TestFailure>();
-  let current: TestFailure | undefined;
+  const cursor: Cursor = { found: new Map(), current: undefined, bunFile: undefined, bunError: "" };
   for (const line of lines) {
     const header = parseHeader(line);
     if (header) {
       const key = `${header.file}\n${header.title}`;
-      current = found.get(key) ?? newFailure(header);
-      found.set(key, current);
+      cursor.current = cursor.found.get(key) ?? newFailure(header);
+      cursor.found.set(key, cursor.current);
+    } else if (readBunLine(cursor, line)) {
+      continue;
     } else if (BLOCK_END.test(line)) {
-      current = undefined;
-    } else if (current && !current.errorLine) {
-      current.errorLine = ERROR_LINE.exec(line)?.[1]?.trim() ?? "";
+      cursor.current = undefined;
+    } else {
+      readErrorLine(cursor.current, line);
     }
   }
-  return [...found.values()];
+  return [...cursor.found.values()];
 }
 
 /** The first `##[error]` line that says something. */
