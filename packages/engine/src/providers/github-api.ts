@@ -86,7 +86,24 @@ async function logFrom(res: FetchResponse): Promise<LogResult> {
   }
 }
 
-export function createApi(fetchImpl: FetchLike, token: string | undefined): Api {
+/** A wait between attempts. Injected so a test does not sleep. */
+export type Wait = (ms: number) => Promise<void>;
+
+const defaultWait: Wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** The wait before each retry of a JSON page: three attempts in all. */
+const PAGE_BACKOFF_MS = [1_000, 4_000];
+
+/** A 5xx GitHub sends for a moment; a 4xx is never retried. */
+function isTransient(res: FetchResponse): boolean {
+  return res.status === 500 || res.status === 502 || res.status === 503 || res.status === 504;
+}
+
+export function createApi(
+  fetchImpl: FetchLike,
+  token: string | undefined,
+  wait: Wait = defaultWait,
+): Api {
   const headers: Record<string, string> = {
     accept: "application/vnd.github+json",
     "x-github-api-version": "2022-11-28",
@@ -95,7 +112,13 @@ export function createApi(fetchImpl: FetchLike, token: string | undefined): Api 
   if (token !== undefined && token !== "") headers.authorization = `Bearer ${token}`;
   return {
     async get(url) {
-      const res = await fetchImpl(url, { headers });
+      let res = await fetchImpl(url, { headers });
+      // One retry per delay: the first attempt plus one per wait, three in all.
+      for (const delay of PAGE_BACKOFF_MS) {
+        if (!isTransient(res)) break;
+        await wait(delay);
+        res = await fetchImpl(url, { headers });
+      }
       if (isRateLimited(res)) return { status: "rate-limited" };
       if (res.status === 404 || res.status === 422) return { status: "missing" };
       if (!res.ok) throw new GitHubApiError(res.status, url);
