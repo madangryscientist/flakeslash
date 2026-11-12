@@ -27,7 +27,14 @@ export {
   type Runner,
 } from "./providers/github-actions.ts";
 
-export { findJobFlakes, type JobFlake } from "./flakes.ts";
+export {
+  findJobFlakes,
+  nameFlakeTests,
+  type Flake,
+  type FlakeTest,
+  type JobFlake,
+  type TestFlake,
+} from "./flakes.ts";
 
 export { cleanLog, cutLog } from "./excerpt.ts";
 

@@ -5,7 +5,7 @@
  */
 import { failureFrom, matchText, place, type Failure, type Issue } from "./catalogue.ts";
 import { cleanLog, cutLog } from "./excerpt.ts";
-import { findJobFlakes, outcomeOf, type JobFlake } from "./flakes.ts";
+import { findJobFlakes, nameFlakeTests, outcomeOf, type JobFlake } from "./flakes.ts";
 import {
   readGitHubActions,
   readJobLog,
@@ -132,6 +132,7 @@ async function confirmIssues(
   store: Store,
   flakes: JobFlake[],
   issues: Map<string, Issue>,
+  failures: Failure[],
 ): Promise<void> {
   const proven = new Set(
     flakes.flatMap((flake) =>
@@ -139,7 +140,7 @@ async function confirmIssues(
     ),
   );
   if (proven.size === 0) return;
-  for (const failure of await store.readFailures()) {
+  for (const failure of failures) {
     const issue = issues.get(failure.issueId);
     if (!proven.has(failure.url) || issue === undefined || issue.status !== "potential") continue;
     issue.status = "confirmed";
@@ -180,7 +181,9 @@ export async function scanRepo(options: ScanRepoOptions): Promise<RepoScan> {
   const issues = new Map((await store.readIssues()).map((issue) => [issue.id, issue]));
   const grouped = await groupFailures(store, repo, jobs, issues);
   const flakes = findJobFlakes(jobs);
-  await confirmIssues(store, flakes, issues);
+  const failures = await store.readFailures();
+  await confirmIssues(store, flakes, issues, failures);
+  const named = nameFlakeTests(flakes, failures, [...issues.values()]);
   return {
     repo,
     cutShort,
@@ -191,6 +194,6 @@ export async function scanRepo(options: ScanRepoOptions): Promise<RepoScan> {
     logsLeft: logs.left,
     newFailures: grouped.failures,
     issuesTouched: grouped.touched,
-    flakes,
+    flakes: named,
   };
 }

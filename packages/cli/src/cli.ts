@@ -13,6 +13,7 @@ import {
 import pkg from "../package.json" with { type: "json" };
 import { summarizeExplanations, type Explanations } from "./explanations.ts";
 import { ISSUE_HELP, ISSUE_USAGE, issueCommand } from "./issue.ts";
+import { nameScans, testText } from "./flake-tests.ts";
 import { openSqliteStore } from "./store.ts";
 import { UsageError } from "./usage-error.ts";
 
@@ -211,6 +212,7 @@ function summarize(scan: RepoScan): string {
   else lines.push(`  ${scan.flakes.length} flaky ${scan.flakes.length === 1 ? "job" : "jobs"}:`);
   for (const flake of scan.flakes) {
     lines.push(`  ${flake.workflow} / ${flake.jobName}  ${flake.commit.slice(0, 8)}`);
+    for (const test of flake.tests) lines.push(`    test: ${testText(test)}`);
     for (const item of flake.evidence) lines.push(`    ${item.outcome.padEnd(6)} ${item.url}`);
   }
   if (scan.cutShort) {
@@ -269,7 +271,9 @@ async function scanAll(
         fetch: deps.modelFetch ?? globalThis.fetch,
       });
       const explain = { store, client, model: options.model.model, repos: options.repos };
-      explanations.result = await explainIssues(explain);
+      const result = await explainIssues(explain);
+      explanations.result = result;
+      if (result.explained > 0) await nameScans(store, scans);
     }
   } finally {
     store.close();

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { findJobFlakes, type JobRecord } from "../src/index.ts";
+import {
+  findJobFlakes,
+  nameFlakeTests,
+  type Failure,
+  type Issue,
+  type JobRecord,
+} from "../src/index.ts";
 
 /** A job record with only the fields the rule reads filled in; the rest are plausible defaults. */
 function job(overrides: Partial<JobRecord> = {}): JobRecord {
@@ -181,5 +187,140 @@ describe("findJobFlakes", () => {
     findJobFlakes(records);
 
     expect(records).toEqual(before);
+  });
+
+  it("keeps a job flake's kind and starts it with no tests", () => {
+    const [flake] = findJobFlakes([
+      job({ runId: 1, conclusion: "failure" }),
+      job({ runId: 2, conclusion: "success" }),
+    ]);
+
+    expect(flake).toMatchObject({ kind: "job", tests: [] });
+  });
+});
+
+/** A failure of the job at `url`, with the fields the naming reads filled in. */
+function failure(overrides: Partial<Failure> = {}): Failure {
+  return {
+    repo: "acme/app",
+    jobId: 100,
+    url: "https://example.test/a1",
+    signature: "sig",
+    issueId: "key:sig",
+    file: null,
+    title: null,
+    location: null,
+    errorLine: "",
+    ...overrides,
+  };
+}
+
+/** An issue with the given id, explained by the model as `component` when one is given. */
+function issue(id: string, component?: string): Issue {
+  return {
+    id,
+    name: id,
+    kind: "other",
+    status: "potential",
+    signatures: [],
+    edited: false,
+    explanation:
+      component === undefined
+        ? null
+        : {
+            component,
+            kind: "other",
+            cause: "a cause",
+            evidence: "a line",
+            repo: "acme/app",
+            jobId: 100,
+            model: "m",
+          },
+  };
+}
+
+/** A job that failed in attempt 1 and passed in attempt 2 on one commit, so it is a flake. */
+const flakyJob = [
+  job({ runAttempt: 1, conclusion: "failure", url: "https://example.test/a1" }),
+  job({ runAttempt: 2, conclusion: "success", url: "https://example.test/a2" }),
+];
+
+describe("nameFlakeTests", () => {
+  it("names a job flake's test from the log, with source log, when its failure prints a test location", () => {
+    const flakes = findJobFlakes(flakyJob);
+    const named = nameFlakeTests(
+      flakes,
+      [
+        failure({
+          file: "e2e/upload.spec.ts",
+          title: "uploads a file",
+          location: "e2e/upload.spec.ts:141",
+        }),
+      ],
+      [],
+    );
+
+    expect(named[0]?.tests).toEqual([
+      {
+        name: "uploads a file",
+        file: "e2e/upload.spec.ts",
+        location: "e2e/upload.spec.ts:141",
+        source: "log",
+      },
+    ]);
+  });
+
+  it("names a bun failure after a log gap by its title, with an empty file, as source log", () => {
+    const named = nameFlakeTests(
+      findJobFlakes(flakyJob),
+      [failure({ file: "", title: "adds two numbers", location: "" })],
+      [],
+    );
+
+    expect(named[0]?.tests).toEqual([
+      { name: "adds two numbers", file: null, location: null, source: "log" },
+    ]);
+  });
+
+  it("names a failure with no test location from its issue's model component, with source model", () => {
+    const named = nameFlakeTests(
+      findJobFlakes(flakyJob),
+      [failure({ issueId: "key:x" })],
+      [issue("key:x", "tests/login.spec.ts full name")],
+    );
+
+    expect(named[0]?.tests).toEqual([
+      { name: "tests/login.spec.ts full name", file: null, location: null, source: "model" },
+    ]);
+  });
+
+  it("gives no flake for a named failure with no pass on that commit, and adds none", () => {
+    const records = [job({ runAttempt: 1, conclusion: "failure", url: "https://example.test/a1" })];
+    const named = nameFlakeTests(
+      findJobFlakes(records),
+      [failure({ file: "e2e/upload.spec.ts", title: "uploads", location: "e2e/upload.spec.ts:1" })],
+      [],
+    );
+
+    expect(findJobFlakes(records)).toEqual([]);
+    expect(named).toEqual([]);
+  });
+
+  it("gives the same flakes, with the same jobs, commits and evidence, with or without failures and issues", () => {
+    const flakes = findJobFlakes(flakyJob);
+    const bare = ({ tests: _tests, ...rest }: (typeof flakes)[number]) => rest;
+    const named = nameFlakeTests(
+      flakes,
+      [
+        failure({ file: "e2e/upload.spec.ts", title: "uploads", location: "e2e/upload.spec.ts:1" }),
+        failure({ url: "https://example.test/a2", issueId: "key:x" }),
+      ],
+      [issue("key:x", "Install step")],
+    );
+    const unnamed = nameFlakeTests(flakes, [], []);
+
+    expect(named.map(bare)).toEqual(flakes.map(bare));
+    expect(unnamed.map(bare)).toEqual(flakes.map(bare));
+    expect(unnamed[0]?.tests).toEqual([]);
   });
 });

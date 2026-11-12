@@ -200,7 +200,8 @@ describe("flakeslash scan: failures grouped into issues", () => {
       [logPath(30)]: text(playwrightLog(["solid", "Error: really broken"])),
     };
     const gh = fakeGitHub(ghRoutes);
-    await scan.exec(["scan", REPO, "--since", SINCE], gh);
+    const first = await scan.exec(["scan", REPO, "--since", SINCE], gh);
+    expect(first.out).toContain("    test: flaky at e2e/upload.spec.ts:141 (log)");
 
     const statusOf = async () =>
       Object.fromEntries((await scan.issues()).map((issue) => [issue.name, issue.status]));
