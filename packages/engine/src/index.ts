@@ -18,7 +18,9 @@ export type { HeldAttempt, JobExcerpt, ModelCall, Store } from "./store.ts";
 export {
   isRepoName,
   readGitHubActions,
+  readCompare,
   readJobLog,
+  type CompareResult,
   type FetchLike,
   type JobRecord,
   type LogResult,
@@ -37,6 +39,8 @@ export {
 } from "./flakes.ts";
 
 export { flakeRates, type FlakeRate } from "./rate.ts";
+
+export { findSuspects, type Compare, type Suspect } from "./suspects.ts";
 
 export { cleanLog, cutLog } from "./excerpt.ts";
 

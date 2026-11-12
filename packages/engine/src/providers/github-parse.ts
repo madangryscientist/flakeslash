@@ -126,3 +126,17 @@ export function pickPullNumber(body: unknown, branch: string | null): number | n
   const same = pulls.find((pull) => str(record(pull.head ?? {}, "head").ref) === branch);
   return num((same ?? pulls[0])?.number);
 }
+
+/**
+ * The filenames of a compare answer, as GitHub gave them. Null when `files` is absent, not a list, or an
+ * entry has no string `filename`: the answer cannot say what changed, so it is not a usable compare.
+ */
+export function parseCompareFiles(body: unknown): string[] | null {
+  if (!isRecord(body) || !Array.isArray(body.files)) return null;
+  const names: string[] = [];
+  for (const entry of body.files) {
+    if (!isRecord(entry) || typeof entry.filename !== "string") return null;
+    names.push(entry.filename);
+  }
+  return names;
+}

@@ -7,13 +7,16 @@ import { failureFrom, matchText, place, type Failure, type Issue } from "./catal
 import { cleanLog, cutLog } from "./excerpt.ts";
 import { findJobFlakes, nameFlakeTests, outcomeOf, type JobFlake } from "./flakes.ts";
 import {
+  readCompare,
   readGitHubActions,
   readJobLog,
+  type CompareResult,
   type FetchLike,
   type JobRecord,
 } from "./providers/github-actions.ts";
 import { redact } from "./redact.ts";
 import { signatures } from "./signature.ts";
+import { findSuspects, type Suspect } from "./suspects.ts";
 import type { Store } from "./store.ts";
 
 interface ScanRepoOptions {
@@ -47,6 +50,8 @@ export interface RepoScan {
   issuesTouched: number;
   /** Every flake among the jobs the store holds for the repo. */
   flakes: JobFlake[];
+  /** Failures that look flaky with no proof: the next commit passed and the compare touched no failed file. */
+  suspects: Suspect[];
 }
 
 /**
@@ -149,6 +154,31 @@ async function confirmIssues(
 }
 
 /**
+ * The compare of two commits, from the store when it holds one, else from GitHub. A pair of commits
+ * never changes, so an `ok` or `missing` answer is stored and never asked again. A rate-limited answer
+ * is not stored, and reads as no suspect until the next scan.
+ */
+async function compareOf(
+  options: ScanRepoOptions,
+  repo: string,
+  base: string,
+  head: string,
+): Promise<CompareResult> {
+  const { store } = options;
+  const held = await store.readCompare(repo, base, head);
+  if (held !== null) return held;
+  const result = await readCompare({
+    repo,
+    base,
+    head,
+    fetch: options.fetch,
+    ...(options.token === undefined ? {} : { token: options.token }),
+  });
+  await store.writeCompare(repo, base, head, result);
+  return result;
+}
+
+/**
  * Scan one repo. Attempts the store already holds are not fetched again, and each run's records are
  * stored as soon as the run is read, so a failure partway through loses only the run it was in.
  * A held attempt keeps the pull request number it was read with. Then the log of each failed job
@@ -184,6 +214,9 @@ export async function scanRepo(options: ScanRepoOptions): Promise<RepoScan> {
   const failures = await store.readFailures();
   await confirmIssues(store, flakes, issues, failures);
   const named = nameFlakeTests(flakes, failures, [...issues.values()]);
+  const suspects = await findSuspects(jobs, failures, (compareRepo, base, head) =>
+    compareOf(options, compareRepo, base, head),
+  );
   return {
     repo,
     cutShort,
@@ -195,5 +228,6 @@ export async function scanRepo(options: ScanRepoOptions): Promise<RepoScan> {
     newFailures: grouped.failures,
     issuesTouched: grouped.touched,
     flakes: named,
+    suspects,
   };
 }
