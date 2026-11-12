@@ -28,8 +28,10 @@ The pass/fail record decides what is a flake, and the model never does. That kee
 reproducible, and it stays safe to rerun or swap the model.
 
 - A **flake** passed and failed on the same commit, through a test retry, a CI re-run or a second run.
-  It is recorded at test level when the test is named, and at job level when it is not, as when a
-  runner dies or a browser crashes before any results are written.
+  The job that failed and passed is always the record, because that is what pass and fail prove. It
+  names the tests it can, from the log, and from JUnit once that reader exists. A model's name for a test
+  is a label for people to read, never counted. A retry inside one passing job is a test flake, seen only
+  through JUnit, since passing jobs' logs are not read.
 - A **suspect** matches a looser pattern, such as a test that fails on a PR and passes after an
   unrelated change. It is shown, and it never counts in the flake rate.
 - The **flake rate** is flaky commits out of commits that ran the test, over the last 30 days.
