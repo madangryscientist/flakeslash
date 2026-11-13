@@ -41,8 +41,12 @@ const PLAYWRIGHT_HEADER = /^\s*\d+\) (?:\[[^\]]*\] › )?(.+?):(\d+):\d+ › (.+
  */
 const VITEST_HEADER = /^\s*FAIL\s+(?:[^\s>]+\s+)?(\S+?)(?::(\d+)(?::\d+)?)?\s+>\s+(.+?)\s*$/;
 
-/** `##[group]test/cache.test.ts:` or a bare `test/cache.test.ts:`: the file header of bun's output. */
-const BUN_FILE = /^(?:##\[group\])?(\S.*?\.(?:test|spec)\.[cm]?[jt]sx?):\s*$/;
+/**
+ * `##[group]test/cache.test.ts:`, `::group::test/cache.test.ts:` (the group marker as GitHub prints
+ * it inside a moon task, where it is never turned into `##[group]`), or a bare `test/cache.test.ts:`:
+ * the file header of bun's output.
+ */
+const BUN_FILE = /^(?:##\[group\]|::group::)?(\S.*?\.(?:test|spec)\.[cm]?[jt]sx?):\s*$/;
 
 /** `✗ cache > re-pulls a stale copy [5305.18ms]`, or `(fail)` off a TTY. The duration is not the title. */
 const BUN_FAILED = /^\s*(?:✗|\(fail\))\s+(.+?)(?:\s+\[[\d.]+\s?m?s\]|\s+\|\s+[\d.]+\s?m?s)?\s*$/;
@@ -61,7 +65,10 @@ const TIMED_OUT = /^\s*\^\s*(this test timed out after [\d.]+\s?ms\.?)/;
 
 /** Where a test's block ends when no further header comes first. */
 const BLOCK_END =
-  /^…$|^\s*\d+ (?:failed|flaky|skipped|did not run|passed)\b|^\s*(?:Test Files|Tests)\s|^##\[(?:group|endgroup)\]/;
+  /^…$|^\s*\d+ (?:failed|flaky|skipped|did not run|passed)\b|^\s*(?:Test Files|Tests)\s|^##\[(?:group|endgroup)\]|^::(?:group|endgroup)::/;
+
+/** A group's end, as GitHub prints it or as a moon task carried it through with its prefix. */
+const GROUP_END = /^(?:##\[endgroup\]|::endgroup::)/;
 
 /** After whitespace and an optional `##[error]`: `Error:` or `<Name>Error:`. */
 const ERROR_LINE = /^\s*(?:##\[error\])?\s*((?:[A-Za-z]\w*)?Error:.*)$/;
@@ -188,7 +195,9 @@ function readBunLine(cursor: Cursor, line: string): boolean {
     cursor.current = undefined;
     return true;
   }
-  if (line.startsWith("##[endgroup]") || line === "…") cursor.bunFile = undefined;
+  // A group's file stops applying at its end, whether GitHub wrote the marker as `##[group]` or
+  // moon's task carried it as a literal `::group::`.
+  if (GROUP_END.test(line) || line === "…") cursor.bunFile = undefined;
   cursor.bunError = BUN_ERROR.exec(line)?.[1] ?? cursor.bunError;
   return false;
 }
@@ -198,6 +207,40 @@ function readErrorLine(current: TestFailure | undefined, line: string): void {
   if (!current || current.errorLine) return;
   const text = ERROR_LINE.exec(line)?.[1] ?? TIMED_OUT.exec(line)?.[1];
   current.errorLine = text?.trim() ?? "";
+}
+
+/**
+ * Moon's task prefix: the target, right-aligned, then ` | ` and the line the task printed. With
+ * `--concurrency` the lines of several targets interleave, so each target's output is read as one
+ * stream; otherwise one task's line would move another task's bun cursor.
+ */
+const MOON_PREFIX = /^\s*([\w@./-]+:[\w.-]+) \|(?: |$)/;
+
+/**
+ * The excerpt's lines split into the streams a job wrote them in: one per moon target, with the
+ * prefix removed, and the unprefixed lines last. Target streams come first so a task's own copy of a
+ * test wins. A log with no moon prefix is a single unprefixed stream, so Nx and bare output read
+ * exactly as they did.
+ */
+function testStreams(lines: string[]): Map<string, string[]> {
+  const job: string[] = [];
+  const streams = new Map<string, string[]>();
+  for (const line of lines) {
+    const prefix = MOON_PREFIX.exec(line);
+    if (prefix === null) {
+      job.push(line);
+      continue;
+    }
+    const target = prefix[1] ?? "";
+    let stream = streams.get(target);
+    if (stream === undefined) {
+      stream = [];
+      streams.set(target, stream);
+    }
+    stream.push(line.slice(prefix[0].length));
+  }
+  streams.set("", job);
+  return streams;
 }
 
 /** Finds the failed tests: Playwright's numbered blocks, Vitest's `FAIL` lines and bun's failed lines, one per test. */
@@ -220,10 +263,59 @@ function findTests(lines: string[]): TestFailure[] {
   return [...cursor.found.values()];
 }
 
+/**
+ * The failed tests, one per file and title. The file and title are what the signature is made of,
+ * and the store keys a failure on its signature for a job, so two streams reporting the same test
+ * are one failure: `moon ci` echoes each failed task in a REVIEW block with no prefix, and two
+ * targets can print the same project-relative path (the ticket keeps it project-relative). Target
+ * streams come first, so the task's own copy of a test is the one kept.
+ */
+function findStreamTests(streams: Map<string, string[]>): TestFailure[] {
+  const kept = new Map<string, TestFailure>();
+  for (const test of [...streams.values()].flatMap(findTests)) {
+    const key = `${test.file}\n${test.title}`;
+    if (!kept.has(key)) kept.set(key, test);
+  }
+  return [...kept.values()];
+}
+
 /** The `Failed tasks:` header of Nx's summary, which lists the tasks that failed, one `- project:target` each. */
 const NX_FAILED_HEADER = /^\s*Failed tasks:\s*$/;
 
 const NX_FAILED_TASK = /^\s*-\s+(\S+:\S+)\s*$/;
+
+/** Moon's end summary: `  × Task cli-core:test failed to run.`, once per task that failed. */
+const MOON_FAILED_TASK = /^\s*×\s+Task\s+(\S+:\S+)\s+failed to run\.?\s*$/;
+
+/** Moon ci's summary, which names a failed task as `fail RunTask(red:test) (20ms, dce10300)`. */
+const MOON_CI_FAILED_TASK = /^\s*fail\s+RunTask\(([^)\s]+)\)/;
+
+/**
+ * Moon ci's summary opens with a ` SUMMARY ` line. Only the lines below it are its verdict; a task's
+ * own output, which moon ci echoes in its REVIEW block, can hold a line that looks like one.
+ */
+const MOON_CI_SUMMARY = /^\s*SUMMARY\s*$/;
+
+/** Moon ci's REVIEW block opens with a ` REVIEW ` line; the lines below it are task output, not the job's. */
+const MOON_CI_REVIEW = /^\s*REVIEW\s*$/;
+
+/**
+ * The job's own lines: unprefixed, and not the task output moon ci echoes in its REVIEW block. That
+ * block runs from its ` REVIEW ` line to the last ` SUMMARY ` below it, which is moon's own; a lone
+ * ` REVIEW ` with no summary after it is not moon's block, so nothing is dropped and a bare or Nx
+ * log keeps its lines. A task's ` ##[error]`-shaped line or summary belongs to the task.
+ */
+function jobLines(lines: string[]): string[] {
+  const reviewAt = lines.findIndex((line) => MOON_CI_REVIEW.test(line));
+  const summaryAt = lines.findLastIndex((line) => MOON_CI_SUMMARY.test(line));
+  const echoed = reviewAt !== -1 && summaryAt > reviewAt;
+  const out: string[] = [];
+  lines.forEach((line, index) => {
+    if (echoed && index > reviewAt && index < summaryAt) return;
+    if (MOON_PREFIX.exec(line) === null) out.push(line);
+  });
+  return out;
+}
 
 /** The tasks Nx lists as failed, in order and once each. Blank lines are skipped; the list ends at any other line. */
 function failedTasks(lines: string[]): string[] {
@@ -235,6 +327,29 @@ function failedTasks(lines: string[]): string[] {
     const match = NX_FAILED_TASK.exec(line);
     if (!match) break;
     tasks.add(match[1] ?? "");
+  }
+  return [...tasks];
+}
+
+/** The tasks moon's own summary names as failed, in order and once each, from either of its two shapes. */
+function moonFailedTasks(lines: string[]): string[] {
+  const tasks = new Set<string>();
+  for (const line of lines) {
+    const match = MOON_FAILED_TASK.exec(line);
+    if (match) tasks.add(match[1] ?? "");
+  }
+  for (const task of moonCiFailedTasks(lines)) tasks.add(task);
+  return [...tasks];
+}
+
+/** The `fail RunTask(<target>)` lines below moon ci's last ` SUMMARY ` header, in order and once each. */
+function moonCiFailedTasks(lines: string[]): string[] {
+  const at = lines.findLastIndex((line) => MOON_CI_SUMMARY.test(line));
+  if (at === -1) return [];
+  const tasks = new Set<string>();
+  for (const line of lines.slice(at + 1)) {
+    const match = MOON_CI_FAILED_TASK.exec(line);
+    if (match) tasks.add(match[1] ?? "");
   }
   return [...tasks];
 }
@@ -272,26 +387,48 @@ function errorEntry(errorLine: string): FailureSignature {
 }
 
 /**
+ * Moon's failed-task entry. The target is the identity, so it is hashed as printed: folding the
+ * error line would turn a numeric task name (`pkg:1`, `pkg:2`) into one signature, and two tasks
+ * that failed are two failures.
+ */
+function moonTaskEntry(task: string): FailureSignature {
+  return {
+    file: null,
+    title: null,
+    location: null,
+    errorLine: `moon task ${task} failed with no failed test in its output`,
+    signature: digest("moon-task", task),
+  };
+}
+
+/**
+ * The entries for a job that names no test, from the job's own lines alone: its first real
+ * `##[error]` line, else each task Nx lists as failed, else each task moon's summary names as failed,
+ * else its repo, workflow and job. A task's `##[error]`-shaped output is not the job's, and inside a
+ * moon task GitHub never turned it into an annotation anyway.
+ */
+function jobEntries(lines: string[], job: SignatureJob): FailureSignature[] {
+  const errorLine = findErrorLine(lines);
+  if (errorLine) return [errorEntry(errorLine)];
+  const nx = failedTasks(lines);
+  if (nx.length > 0) {
+    return nx.map((task) => errorEntry(`nx task ${task} failed with no failed test in its output`));
+  }
+  const moon = moonFailedTasks(lines);
+  if (moon.length > 0) return moon.map(moonTaskEntry);
+  return [{ file: null, title: null, location: null, errorLine, signature: jobSignature(job) }];
+}
+
+/**
  * One entry per failure in an excerpt. A failed test is keyed on its file and title alone.
- * Five or more tests with one normalised error are one entry keyed on that error. A job that names
- * no test is keyed on its first real `##[error]` line, else on each task Nx lists as failed, else,
- * with neither, on its repo, workflow and job.
+ * Five or more tests with one normalised error are one entry keyed on that error, and a job that
+ * names no test is keyed as `jobEntries` says.
  */
 export function signatures(excerpt: string, job: SignatureJob): FailureSignature[] {
   const lines = excerpt.split("\n");
-  const tests = findTests(lines);
-
-  if (tests.length === 0) {
-    const errorLine = findErrorLine(lines);
-    if (errorLine) return [errorEntry(errorLine)];
-    const tasks = failedTasks(lines);
-    if (tasks.length > 0) {
-      return tasks.map((task) =>
-        errorEntry(`nx task ${task} failed with no failed test in its output`),
-      );
-    }
-    return [{ file: null, title: null, location: null, errorLine, signature: jobSignature(job) }];
-  }
+  const streams = testStreams(lines);
+  const tests = findStreamTests(streams);
+  if (tests.length === 0) return jobEntries(jobLines(lines), job);
 
   const counts = countErrors(tests);
   const out: FailureSignature[] = [];
