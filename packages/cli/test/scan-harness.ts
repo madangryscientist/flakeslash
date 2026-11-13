@@ -126,6 +126,8 @@ export function useScan() {
         const code = await run(withStore, {
           fetch: gh.fetch,
           env,
+          // The store is thrown away with the test, so no write need wait for the disk.
+          durable: false,
           ...(modelFetch === undefined ? {} : { modelFetch }),
         });
         return { code, out, err };
@@ -135,7 +137,7 @@ export function useScan() {
     },
     /** Every excerpt row the store holds for `repo`. */
     async excerpts(repo = REPO) {
-      const store = openSqliteStore(storePath());
+      const store = openSqliteStore(storePath(), { durable: false });
       try {
         return await store.readExcerpts(repo);
       } finally {
@@ -144,7 +146,7 @@ export function useScan() {
     },
     /** Every issue the store holds, across repos. */
     async issues() {
-      const store = openSqliteStore(storePath());
+      const store = openSqliteStore(storePath(), { durable: false });
       try {
         return await store.readIssues();
       } finally {
@@ -153,7 +155,7 @@ export function useScan() {
     },
     /** Every failure the store holds, across repos. */
     async failures() {
-      const store = openSqliteStore(storePath());
+      const store = openSqliteStore(storePath(), { durable: false });
       try {
         return await store.readFailures();
       } finally {
@@ -162,7 +164,7 @@ export function useScan() {
     },
     /** Every job row the store holds for `repo`. */
     async rows(repo = REPO) {
-      const store = openSqliteStore(storePath());
+      const store = openSqliteStore(storePath(), { durable: false });
       try {
         return await store.readJobs(repo);
       } finally {

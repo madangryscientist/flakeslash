@@ -16,6 +16,8 @@ export interface Deps {
   /** The model endpoint's POST; the real `fetch` unless a test stands in. */
   modelFetch?: ModelFetch;
   env: Readonly<Record<string, string | undefined>>;
+  /** False lets the store skip waiting for the disk, as a test with a throwaway store wants. Default true. */
+  durable?: boolean;
 }
 
 /** The model endpoint a scan may call: everything `createModelClient` needs but the fetch. */

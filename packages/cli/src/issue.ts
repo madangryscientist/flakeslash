@@ -211,14 +211,14 @@ async function runAction(options: IssueArgs, store: IssueStore): Promise<void> {
 }
 
 /** Runs `flakeslash issue ...` and returns the exit code: 0 ok, 2 a usage error. */
-export async function issueCommand(args: readonly string[]): Promise<number> {
+export async function issueCommand(args: readonly string[], durable?: boolean): Promise<number> {
   try {
     const options = parseIssueArgs(args);
     const path = options.store ?? DEFAULT_STORE_PATH;
     if (!existsSync(path)) {
       throw new UsageError(`no store at ${path}; run flakeslash scan first`);
     }
-    const store = openSqliteStore(path);
+    const store = openSqliteStore(path, { durable });
     try {
       await runAction(options, store);
     } finally {
