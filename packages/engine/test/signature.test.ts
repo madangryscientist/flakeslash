@@ -58,7 +58,7 @@ describe("signatures: stability", () => {
     expect(only(a).signature).toBe(only(b).signature);
   });
 
-  it("gives two signatures to two different errors on one test", () => {
+  it("gives one signature to two different errors on one test", () => {
     const a = block(
       1,
       "e2e/a.spec.ts:10",
@@ -66,7 +66,9 @@ describe("signatures: stability", () => {
       "Error: locator.click: Test timeout of 30000ms exceeded.",
     );
     const b = block(1, "e2e/a.spec.ts:10", "opens", "Error: page.goto: net::ERR_ABORTED");
-    expect(only(a).signature).not.toBe(only(b).signature);
+    expect(only(a).signature).toBe(only(b).signature);
+    expect(only(a).errorLine).toBe("Error: locator.click: Test timeout of 30000ms exceeded.");
+    expect(only(b).errorLine).toBe("Error: page.goto: net::ERR_ABORTED");
   });
 
   it("gives two signatures to one error message on two different tests", () => {
