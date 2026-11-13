@@ -1,9 +1,11 @@
 /**
  * Failure signatures: one per failing test in a job's excerpt, stable across runs.
  *
- * A signature is a hash of what stays the same when the same failure happens again: the test's file
- * and title and its error line, with ports, timestamps, durations and ids removed. The line number
- * is left out, or every edit above a test would start a new issue. Pure: no I/O.
+ * A named test's signature is a hash of its file and its title alone, with Windows paths folded to
+ * POSIX ones: one test is one issue, whatever it printed that run. The error line is kept for the
+ * report, not hashed. An error with no test named is hashed on its own, with ports, timestamps,
+ * durations and ids removed. The line number is left out, or every edit above a test would start a
+ * new issue. Pure: no I/O.
  */
 import { createHash } from "node:crypto";
 
@@ -33,8 +35,11 @@ const SUITE_DOWN = 5;
 /** `  1) [chromium] › e2e/upload.spec.ts:141:1 › the title ───`: a numbered Playwright block. */
 const PLAYWRIGHT_HEADER = /^\s*\d+\) (?:\[[^\]]*\] › )?(.+?):(\d+):\d+ › (.+?)[\s─]*$/;
 
-/** `FAIL  test/dev.test.ts > describe > the title` in a Vitest run or its summary. */
-const VITEST_HEADER = /^\s*FAIL\s+(\S+?)(?::(\d+)(?::\d+)?)?\s+>\s+(.+?)\s*$/;
+/**
+ * `FAIL  test/dev.test.ts > describe > the title` in a Vitest run or its summary, or with a project
+ * label between `FAIL` and the file: `FAIL   main  test/dev.test.ts > describe > the title`.
+ */
+const VITEST_HEADER = /^\s*FAIL\s+(?:[^\s>]+\s+)?(\S+?)(?::(\d+)(?::\d+)?)?\s+>\s+(.+?)\s*$/;
 
 /** `##[group]test/cache.test.ts:` or a bare `test/cache.test.ts:`: the file header of bun's output. */
 const BUN_FILE = /^(?:##\[group\])?(\S.*?\.(?:test|spec)\.[cm]?[jt]sx?):\s*$/;
@@ -82,9 +87,6 @@ const NORMALISE: Array<[RegExp, string]> = [
   [/\b\d{4,}\b/g, "<n>"],
 ];
 
-/** A quoted value in an error line: single, double or backtick quotes. Only a named test's key drops them. */
-const QUOTED = /'[^'\n]*'|"[^"\n]*"|`[^`\n]*`/g;
-
 function normalise(text: string): string {
   let out = text;
   for (const [pattern, replacement] of NORMALISE) out = out.replace(pattern, replacement);
@@ -96,13 +98,13 @@ function digest(...parts: string[]): string {
 }
 
 /**
- * Keeps the three keys apart: a test, an error alone, and a job with neither. For a named test,
- * quoted values in the error line are dropped from the key, so one assertion that got two values
- * is one test's failure, not two.
+ * Keeps the three keys apart: a test, an error alone, and a job with neither. A named test is keyed
+ * on its file and its title alone, so a timeout and an assertion in one test are one issue, and the
+ * error line stays for display only. A Windows path is stripped of its runner root and then folded
+ * to a POSIX one, so `C:\a\proj\proj\test\ui.spec.ts` and `test/ui.spec.ts` are one file.
  */
-function testSignature(file: string, title: string, errorLine: string): string {
-  const shape = normalise(errorLine.replace(QUOTED, "<q>"));
-  return digest("test", normalise(file), title.replace(/\s+/g, " "), shape);
+function testSignature(file: string, title: string): string {
+  return digest("test", normalise(file).replaceAll("\\", "/"), title.replace(/\s+/g, " "));
 }
 
 function errorSignature(errorLine: string): string {
@@ -270,7 +272,7 @@ function errorEntry(errorLine: string): FailureSignature {
 }
 
 /**
- * One entry per failure in an excerpt. A failed test is keyed on its file, title and error line.
+ * One entry per failure in an excerpt. A failed test is keyed on its file and title alone.
  * Five or more tests with one normalised error are one entry keyed on that error. A job that names
  * no test is keyed on its first real `##[error]` line, else on each task Nx lists as failed, else,
  * with neither, on its repo, workflow and job.
@@ -297,7 +299,7 @@ export function signatures(excerpt: string, job: SignatureJob): FailureSignature
   for (const test of tests) {
     const key = test.errorLine ? normalise(test.errorLine) : "";
     if (!key || (counts.get(key) ?? 0) < SUITE_DOWN) {
-      out.push({ ...test, signature: testSignature(test.file, test.title, test.errorLine) });
+      out.push({ ...test, signature: testSignature(test.file, test.title) });
     } else if (!merged.has(key)) {
       merged.add(key);
       out.push(errorEntry(test.errorLine));

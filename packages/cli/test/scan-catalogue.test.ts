@@ -22,7 +22,7 @@ const OTHER = "madangryscientist/hackcove";
 describe("flakeslash scan: failures grouped into issues", () => {
   const scan = useScan();
 
-  it("joins the same crash with other ports and times, and keeps two different errors apart", async () => {
+  it("gives one test one issue across runs, whether it timed out or failed an assertion", async () => {
     const gh = fakeGitHub(
       routesOf(
         [
@@ -31,40 +31,36 @@ describe("flakeslash scan: failures grouped into issues", () => {
           text(
             playwrightLog([
               "uploads a file",
-              "Error: connect ECONNREFUSED 127.0.0.1:3001 at 2026-11-04T10:00:01Z",
+              "Error: locator.click: Test timeout of 30000ms exceeded.",
             ]),
           ),
         ],
         [
           REPO,
           2,
-          text(
-            playwrightLog([
-              "uploads a file",
-              "Error: connect ECONNREFUSED 127.0.0.1:48212 at 2026-11-05T22:41:09Z",
-            ]),
-          ),
+          text(playwrightLog(["uploads a file", "Error: connect ECONNREFUSED 127.0.0.1:48212"])),
         ],
         [REPO, 3, text(playwrightLog(["uploads a file", "Error: expected 1 to be 2"]))],
       ),
     );
     const result = await scan.exec(["scan", REPO, "--since", SINCE], gh);
     expect(result.code).toBe(0);
-    expect(result.out).toContain("new failures: 3 in 2 issues");
+    expect(result.out).toContain("new failures: 3 in 1 issues");
 
     const issues = await scan.issues();
-    expect(issues).toHaveLength(2);
+    expect(issues).toHaveLength(1);
     expect(issues.every((issue) => issue.kind === "other" && issue.status === "potential")).toBe(
       true,
     );
     const failures = await scan.failures();
     expect(failures).toHaveLength(3);
-    const byJob = new Map(failures.map((failure) => [failure.jobId, failure.issueId]));
-    expect(byJob.get(10)).toBe(byJob.get(20));
-    expect(byJob.get(30)).not.toBe(byJob.get(10));
-    expect(issues.find((issue) => issue.id === byJob.get(10))?.name).toBe(
-      "e2e/upload.spec.ts:141: uploads a file",
-    );
+    expect(new Set(failures.map((failure) => failure.issueId)).size).toBe(1);
+    expect(issues[0]?.name).toBe("e2e/upload.spec.ts:141: uploads a file");
+    expect(failures.map((failure) => failure.errorLine).toSorted()).toEqual([
+      "Error: connect ECONNREFUSED 127.0.0.1:48212",
+      "Error: expected 1 to be 2",
+      "Error: locator.click: Test timeout of 30000ms exceeded.",
+    ]);
   });
 
   it("names a known crash by what it is, in one issue across both repos", async () => {
