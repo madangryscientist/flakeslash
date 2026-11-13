@@ -162,6 +162,15 @@ export function useScan() {
         store.close();
       }
     },
+    /** Every attempt row the store holds for `repo`. */
+    async attempts(repo = REPO) {
+      const store = openSqliteStore(storePath(), { durable: false });
+      try {
+        return await store.readAttempts(repo);
+      } finally {
+        store.close();
+      }
+    },
     /** Every job row the store holds for `repo`. */
     async rows(repo = REPO) {
       const store = openSqliteStore(storePath(), { durable: false });

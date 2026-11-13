@@ -4,6 +4,7 @@
  * own: the fetch and the store come in as arguments.
  */
 import { failureFrom, matchText, place, type Failure, type Issue } from "./catalogue.ts";
+import { runCoverage, type RunCoverage } from "./coverage.ts";
 import { cleanLog, cutLog } from "./excerpt.ts";
 import { findJobFlakes, nameFlakeTests, outcomeOf, type JobFlake } from "./flakes.ts";
 import {
@@ -48,6 +49,11 @@ export interface RepoScan {
   newFailures: number;
   /** Distinct issues that got a new failure in this scan. */
   issuesTouched: number;
+  /**
+   * The runs in the window as the store holds them after this scan (all scans, not only this one), with
+   * the runs this scan left unread because they were still running.
+   */
+  coverage: RunCoverage;
   /** Every flake among the jobs the store holds for the repo. */
   flakes: JobFlake[];
   /** Failures that look flaky with no proof: the next commit passed and the compare touched no failed file. */
@@ -179,7 +185,8 @@ async function compareOf(
 }
 
 /**
- * Scan one repo. Attempts the store already holds are not fetched again, and each run's records are
+ * Scan one repo. Attempts the store already holds (an attempt that listed no jobs too) are not fetched
+ * again, and each run's records and attempts are
  * stored as soon as the run is read, so a failure partway through loses only the run it was in.
  * A held attempt keeps the pull request number it was read with. Then the log of each failed job
  * without an excerpt is read and cut down to one (see `readLogs`). Each failed job with an excerpt then
@@ -189,13 +196,14 @@ async function compareOf(
 export async function scanRepo(options: ScanRepoOptions): Promise<RepoScan> {
   const { store } = options;
   const repo = options.repo.toLowerCase();
-  const { records, cutShort } = await readGitHubActions({
+  const { records, cutShort, running, listed } = await readGitHubActions({
     repo,
     since: options.since,
     fetch: options.fetch,
     ...(options.token === undefined ? {} : { token: options.token }),
     held: await store.heldAttempts(repo),
     onRecords: (read) => store.writeJobs(read),
+    onAttempts: (read) => store.writeAttempts(read),
   });
   let oldestRead: string | null = null;
   for (const { startedAt } of records) {
@@ -207,6 +215,8 @@ export async function scanRepo(options: ScanRepoOptions): Promise<RepoScan> {
     }
   }
   const jobs = await store.readJobs(repo);
+  const attempts = await store.readAttempts(repo);
+  const coverage = runCoverage({ attempts, jobs, listed, since: options.since, running });
   const logs = await readLogs(options, repo, jobs, cutShort);
   const issues = new Map((await store.readIssues()).map((issue) => [issue.id, issue]));
   const grouped = await groupFailures(store, repo, jobs, issues);
@@ -227,6 +237,7 @@ export async function scanRepo(options: ScanRepoOptions): Promise<RepoScan> {
     logsLeft: logs.left,
     newFailures: grouped.failures,
     issuesTouched: grouped.touched,
+    coverage,
     flakes: named,
     suspects,
   };

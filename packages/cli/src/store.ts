@@ -6,11 +6,11 @@
 import { Database, type SQLQueryBindings } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { ATTEMPT_SCHEMA, attemptStore } from "./attempt-store.ts";
 import { CATALOGUE_SCHEMA, catalogueStore, migrateCatalogue } from "./catalogue-store.ts";
 import { COMPARE_SCHEMA, compareStore } from "./compare-store.ts";
 import {
   isRunner,
-  type HeldAttempt,
   type JobExcerpt,
   type JobRecord,
   type Runner,
@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS excerpts (
   excerpt TEXT,
   PRIMARY KEY (repo, job_id)
 );
-${COMPARE_SCHEMA}${CATALOGUE_SCHEMA}
+${ATTEMPT_SCHEMA}${COMPARE_SCHEMA}${CATALOGUE_SCHEMA}
 `;
 
 const COLUMNS = `provider, repo, run_id, run_attempt, job_id, workflow, job_name, url, commit_sha,
@@ -185,12 +185,6 @@ export function openSqliteStore(
   const writeAll = db.transaction((jobs: JobRecord[]) => {
     for (const job of jobs) upsert.run(...rowValues(job));
   });
-  const heldQuery = db.query<{ run_id: number; run_attempt: number }, [string]>(
-    `SELECT run_id, run_attempt FROM jobs WHERE repo = ?
-     GROUP BY run_id, run_attempt
-     HAVING SUM(conclusion IS NULL) = 0
-     ORDER BY run_id, run_attempt`,
-  );
   const readQuery = db.query<JobRow, [string]>(
     `SELECT ${COLUMNS} FROM jobs WHERE repo = ? ORDER BY run_id, run_attempt, job_id`,
   );
@@ -209,9 +203,7 @@ export function openSqliteStore(
     async writeJobs(records: JobRecord[]): Promise<void> {
       writeAll(records);
     },
-    async heldAttempts(repo: string): Promise<HeldAttempt[]> {
-      return heldQuery.all(repo).map((row) => ({ runId: row.run_id, runAttempt: row.run_attempt }));
-    },
+    ...attemptStore(db),
     async readJobs(repo: string): Promise<JobRecord[]> {
       return readQuery.all(repo).map(jobFromRow);
     },

@@ -5,8 +5,12 @@
  */
 import type { Failure, Issue } from "./catalogue.ts";
 import type { CompareResult, JobRecord } from "./providers/github-actions.ts";
+import type { ReadAttempt } from "./providers/github-attempt.ts";
 
-/** One attempt of one run that the store holds with every job finished (no job has a null conclusion). */
+/**
+ * One attempt of one run that the store holds in full: every job it lists is finished (no job has a null
+ * conclusion), or it was read and listed no jobs at all.
+ */
 export interface HeldAttempt {
   runId: number;
   runAttempt: number;
@@ -41,8 +45,15 @@ export interface Store {
   /** Stores the records. A record whose job is already held replaces that job's row. */
   writeJobs(records: JobRecord[]): Promise<void>;
   /**
-   * The attempts of `repo` the store holds in full, as far as its rows show. An attempt with any
-   * unfinished job is not held.
+   * Stores the attempts, jobs or none. An attempt with the same repo, run and attempt replaces its row.
+   * These rows are never jobs: `readJobs` does not return them.
+   */
+  writeAttempts(attempts: ReadAttempt[]): Promise<void>;
+  /** Every attempt row of `repo` (see `writeAttempts`). */
+  readAttempts(repo: string): Promise<ReadAttempt[]>;
+  /**
+   * The attempts of `repo` the store holds in full, as far as its rows show: those with jobs, none of
+   * them unfinished, and those read with no jobs. An attempt with any unfinished job is not held.
    */
   heldAttempts(repo: string): Promise<HeldAttempt[]>;
   /** Every job the store holds for `repo`, as written. */

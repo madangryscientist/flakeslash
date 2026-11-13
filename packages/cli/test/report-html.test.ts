@@ -38,6 +38,7 @@ describe("reportHtml", () => {
       ranked: [ranked],
       excerpts: new Map([[URL, excerpt]]),
       repos: ["acme/app"],
+      coverage: [],
       now: "2026-12-01T00:00:00.000Z",
     });
 
@@ -55,6 +56,7 @@ describe("reportHtml", () => {
         [URL, { repo: "acme/app", jobId: 10, url: URL, status: "gone", excerpt: null }],
       ]),
       repos: ["acme/app"],
+      coverage: [],
       now: "2026-12-01T00:00:00.000Z",
     });
 
@@ -67,6 +69,7 @@ describe("reportHtml", () => {
       ranked: [ranked],
       excerpts: new Map(),
       repos: ["acme/app"],
+      coverage: [],
       now: "2026-12-01T00:00:00.000Z",
     });
 
