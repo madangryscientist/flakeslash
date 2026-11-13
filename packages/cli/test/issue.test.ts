@@ -178,7 +178,7 @@ describe("flakeslash issue", () => {
       expect(short.code).toBe(2);
       expect(short.err).toContain("a prefix needs 8 characters or more");
 
-      const store = openSqliteStore(scan.storePath());
+      const store = openSqliteStore(scan.storePath(), { durable: false });
       try {
         const base = (await store.readIssues())[0];
         if (base === undefined) throw new Error("no issue");

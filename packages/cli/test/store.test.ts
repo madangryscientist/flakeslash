@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Failure, Issue, JobExcerpt, JobRecord } from "@hackcove/flakeslash-engine";
@@ -58,7 +58,7 @@ describe("the SQLite store", () => {
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), "flakeslash-store-"));
-    store = openSqliteStore(join(dir, "flakeslash.db"));
+    store = openSqliteStore(join(dir, "flakeslash.db"), { durable: false });
   });
 
   afterEach(() => {
@@ -124,7 +124,7 @@ describe("the SQLite store", () => {
     await store.writeJobs(written);
     store.close();
 
-    store = openSqliteStore(path);
+    store = openSqliteStore(path, { durable: false });
 
     expect(await store.readJobs(REPO)).toEqual(written);
   });
@@ -133,7 +133,7 @@ describe("the SQLite store", () => {
     const parent = join(dir, "nested", "deeper");
     expect(existsSync(parent)).toBe(false);
 
-    const opened = openSqliteStore(join(parent, "flakeslash.db"));
+    const opened = openSqliteStore(join(parent, "flakeslash.db"), { durable: false });
     opened.close();
 
     expect(existsSync(parent)).toBe(true);
@@ -178,7 +178,7 @@ describe("the SQLite store", () => {
       old.exec("INSERT INTO excerpts VALUES ('r/x', 1, 'u', 'kept', 'e')");
       old.close();
 
-      const opened = openSqliteStore(path);
+      const opened = openSqliteStore(path, { durable: false });
       try {
         expect(await opened.readIssues()).toEqual([]);
         expect(await opened.readFailures()).toEqual([]);
@@ -199,7 +199,7 @@ describe("the SQLite store", () => {
       );
       old.close();
 
-      const opened = openSqliteStore(path);
+      const opened = openSqliteStore(path, { durable: false });
       try {
         const [held] = await opened.readIssues();
         expect(held).toEqual({
@@ -258,5 +258,29 @@ describe("the SQLite store", () => {
         { repo: REPO, jobId: 2, issueId: "key:a", outcome: "invalid" },
       ]);
     });
+  });
+});
+
+describe("the SQLite store file", () => {
+  it("has every write in the main file once closed, with no -wal or -shm needed", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "flakeslash-store-file-"));
+    try {
+      const path = join(dir, "flakeslash.db");
+      const store = openSqliteStore(path);
+      await store.writeJobs([job()]);
+      store.close();
+
+      // Only the main file is copied: a write left in the log would be lost.
+      const alone = join(dir, "copy.db");
+      copyFileSync(path, alone);
+      const again = openSqliteStore(alone, { durable: false });
+      try {
+        expect(await again.readJobs(REPO)).toHaveLength(1);
+      } finally {
+        again.close();
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

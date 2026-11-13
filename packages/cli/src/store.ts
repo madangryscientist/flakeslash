@@ -153,11 +153,31 @@ function rowValues(job: JobRecord): SQLQueryBindings[] {
  * Opens (creating it, and its parent directory, when missing) the SQLite store at `path` and makes sure
  * its table exists. Close it with `close()` when done.
  */
-export function openSqliteStore(path: string = DEFAULT_STORE_PATH): SqliteStore {
+export function openSqliteStore(
+  path: string = DEFAULT_STORE_PATH,
+  { durable = true }: { durable?: boolean | undefined } = {},
+): SqliteStore {
   mkdirSync(dirname(path), { recursive: true });
   const db = new Database(path, { create: true, strict: true });
-  db.exec(SCHEMA);
-  migrateCatalogue(db);
+  // A first open converts an old rollback-journal file to WAL, which needs a lock another command may hold.
+  db.exec("PRAGMA busy_timeout = 5000");
+  const wal =
+    db.query<{ journal_mode: string }, []>("PRAGMA journal_mode = WAL").get()?.journal_mode ===
+    "wal";
+  // WAL with `synchronous = NORMAL` drops the fsync per commit. A crash cannot corrupt the file; a
+  // power cut mid-command can lose that command's last commits, which a rerun repeats. When it is the
+  // last connection to the file, `close()` checkpoints into the main file and syncs it, so a command
+  // that returned has its writes on disk; while another command still has the file open, they wait for
+  // that one to close. Where WAL is refused the file keeps SQLite's default (`FULL`).
+  // `durable: false` is for a throwaway store, such as a test's: no write waits for the disk at all.
+  if (!durable) db.exec("PRAGMA synchronous = OFF");
+  else if (wal) db.exec("PRAGMA synchronous = NORMAL");
+  // One transaction for the whole schema: a fresh file costs one commit, not one per statement. It
+  // starts as a write, so two commands opening an old file at once wait on busy_timeout, not fail.
+  db.transaction(() => {
+    db.exec(SCHEMA);
+    migrateCatalogue(db);
+  }).immediate();
 
   const upsert = db.prepare(
     `INSERT OR REPLACE INTO jobs (${COLUMNS}) VALUES (${Array(18).fill("?").join(", ")})`,
@@ -219,7 +239,8 @@ export function openSqliteStore(path: string = DEFAULT_STORE_PATH): SqliteStore 
     ...catalogueStore(db),
     ...compareStore(db),
     close(): void {
-      db.close();
+      // `true` finalizes the open statements, so the connection really closes and the log is folded back.
+      db.close(true);
     },
   };
 }

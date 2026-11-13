@@ -134,7 +134,7 @@ async function scanAll(
   scans: RepoScan[],
   explanations: Explanations,
 ): Promise<ReportInput> {
-  const store = openSqliteStore(options.store);
+  const store = openSqliteStore(options.store, { durable: deps.durable });
   try {
     for (const repo of options.repos) {
       scans.push(await scanRepo({ repo, since: options.since, fetch: deps.fetch, token, store }));
@@ -219,7 +219,7 @@ export async function run(
     return 0;
   }
   if (first === "scan") return scanCommand(rest, deps);
-  if (first === "issue") return issueCommand(rest);
+  if (first === "issue") return issueCommand(rest, deps.durable);
   process.stderr.write(`flakeslash: unknown argument "${first}". Try --help.\n`);
   return 2;
 }

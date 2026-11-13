@@ -237,7 +237,7 @@ describe("flakeslash scan: explanations", () => {
       ),
     );
     await scan.exec(SCAN, gh, env);
-    const store = openSqliteStore(scan.storePath());
+    const store = openSqliteStore(scan.storePath(), { durable: false });
     try {
       const edited = (await store.readIssues()).find((issue) => issue.name.endsWith(": a"));
       await store.writeIssue({ ...edited!, name: "renamed by a person", edited: true });
