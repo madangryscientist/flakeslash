@@ -36,7 +36,8 @@ export async function catalogueOf(
     suspects: scans.flatMap((scan) => scan.suspects),
     now,
   });
-  return { ranked, excerpts, repos, now };
+  const coverage = scans.map((scan) => ({ repo: scan.repo, coverage: scan.coverage }));
+  return { ranked, excerpts, repos, coverage, now };
 }
 
 /** The catalogue's JSON: each ranked issue, in rank order. */

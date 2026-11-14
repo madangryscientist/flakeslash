@@ -3,7 +3,8 @@
  * to the store. Pure: the caller gives the ranked issues, the excerpts by page and the time. Every piece
  * of text goes through `escapeHtml`, log text included.
  */
-import type { JobExcerpt, RankedIssue } from "@hackcove/flakeslash-engine";
+import type { JobExcerpt, RankedIssue, RunCoverage } from "@hackcove/flakeslash-engine";
+import { coverageLine } from "./coverage-line.ts";
 
 export interface ReportInput {
   /** The ranked issues, in rank order. */
@@ -12,6 +13,8 @@ export interface ReportInput {
   excerpts: ReadonlyMap<string, JobExcerpt>;
   /** The repos this run scanned. */
   repos: readonly string[];
+  /** The runs in the window of each repo this run scanned. */
+  coverage: readonly { repo: string; coverage: RunCoverage }[];
   /** An ISO time, shown in the head. */
   now: string;
 }
@@ -90,6 +93,15 @@ function cardHtml(issue: RankedIssue, excerpts: ReadonlyMap<string, JobExcerpt>)
   ].join("\n");
 }
 
+function coverageHtml(input: ReportInput): string {
+  if (input.coverage.length === 0) return "";
+  const items = input.coverage.map(
+    ({ repo, coverage }) =>
+      `<li><strong>${escapeHtml(repo)}</strong> ${escapeHtml(coverageLine(coverage))}</li>`,
+  );
+  return `<ul class="coverage">\n${items.join("\n")}\n</ul>`;
+}
+
 const STYLES = `
 :root {
   --bg: #fafafc;
@@ -123,6 +135,7 @@ main { max-width: 72rem; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
 h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
 h2 { font-size: 1.1rem; margin: 0; overflow-wrap: anywhere; }
 .meta { color: var(--muted); margin: 0 0 1.5rem; overflow-wrap: anywhere; }
+.coverage { margin: -0.75rem 0 1.5rem; padding: 0; list-style: none; color: var(--muted); overflow-wrap: anywhere; }
 .issue { background: var(--card); border: 1px solid var(--line); border-radius: 0.6rem; padding: 1rem; margin: 0 0 1rem; min-width: 0; }
 .issue header { display: flex; gap: 0.6rem; align-items: baseline; min-width: 0; }
 .rank { color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
@@ -158,6 +171,7 @@ export function reportHtml(input: ReportInput): string {
     `<main>`,
     `<h1>FlakeSlash report</h1>`,
     `<p class="meta">${repos} | ${escapeHtml(input.now)}</p>`,
+    coverageHtml(input),
     body,
     `</main>`,
     `</body>`,

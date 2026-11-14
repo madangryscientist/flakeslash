@@ -82,6 +82,34 @@ describe("readGitHubActions: attempts", () => {
   });
 });
 
+describe("readGitHubActions: a listing that ends in a 404", () => {
+  it("keeps the jobs of the pages read and reports the attempt, without ending the read", async () => {
+    const next = `${API}/repositories/1/actions/runs/5/attempts/1/jobs?per_page=100&page=2`;
+    const gh = fakeGitHub({
+      [RUNS]: runsOf(run(5, "2026-11-03T00:00:00Z")),
+      [pullsPath("5".padStart(40, "a"))]: json([]),
+      [jobsPath(5, 1)]: json(
+        { total_count: 2, jobs: [job(1, 5)] },
+        { headers: { link: `<${next}>; rel="next"` } },
+      ),
+      "/repositories/1/actions/runs/5/attempts/1/jobs?per_page=100&page=2": json(
+        { message: "Not Found" },
+        { status: 404 },
+      ),
+    });
+    const attempts: { jobCount: number }[] = [];
+    const read = await readGitHubActions({
+      repo: REPO,
+      since,
+      fetch: gh.fetch,
+      onAttempts: async (reported) => void attempts.push(...reported),
+    });
+    expect(read.cutShort).toBe(false);
+    expect(read.records.map((record) => record.jobId)).toEqual([1]);
+    expect(attempts.map((attempt) => attempt.jobCount)).toEqual([1]);
+  });
+});
+
 describe("readGitHubActions: pull requests", () => {
   it("looks a commit up once, however many runs it has", async () => {
     const sha = "b".repeat(40);

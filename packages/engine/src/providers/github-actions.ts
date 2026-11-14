@@ -28,6 +28,7 @@ import {
   type JobStep,
 } from "./github-parse.ts";
 import type { HeldAttempt } from "../store.ts";
+import type { ListedRun, ReadAttempt } from "./github-attempt.ts";
 import type { Runner } from "./github-runner.ts";
 
 export type { FetchLike, LogResult } from "./github-api.ts";
@@ -74,6 +75,8 @@ export interface ReadGitHubActionsOptions {
    * holds all of them.
    */
   onRecords?: (records: JobRecord[]) => Promise<void>;
+  /** Awaited after `onRecords` with the attempts read for a run, those with no jobs too (so they are held). */
+  onAttempts?: (attempts: ReadAttempt[]) => Promise<void>;
   /** Waits between retried GitHub 5xx answers. Defaults to a real timer; a test passes its own. */
   wait?: Wait;
 }
@@ -82,6 +85,13 @@ export interface ReadGitHubActionsResult {
   records: JobRecord[];
   /** True when a rate limit ended the read early. `records` is then what was read, not everything. */
   cutShort: boolean;
+  /**
+   * The runs listed in the window whose latest attempt had not completed, so was left unread. Noted as
+   * the listing gives them, so a rate limit later in the run does not hide one.
+   */
+  running: Set<number>;
+  /** Every run the listing gave in the window, held or not. */
+  listed: Map<number, ListedRun>;
 }
 
 interface Ctx {
@@ -93,6 +103,9 @@ interface Ctx {
   held: Map<number, Set<number>>;
   records: JobRecord[];
   onRecords: (records: JobRecord[]) => Promise<void>;
+  onAttempts: (attempts: ReadAttempt[]) => Promise<void>;
+  running: Set<number>;
+  listed: Map<number, ListedRun>;
 }
 
 const REPO = /^[\w.-]+\/[\w.-]+$/;
@@ -176,7 +189,10 @@ function toRecord({ repo, run, attempt, pr }: Origin, job: ApiJob): JobRecord {
   };
 }
 
-/** One attempt's jobs as records. Nothing of an attempt is kept if a rate limit ends it midway. */
+/**
+ * One attempt's jobs as records; none for an attempt that lists no jobs or answers 404. Nothing of an
+ * attempt is kept if a rate limit ends it midway.
+ */
 async function readAttempt(
   ctx: Ctx,
   run: ApiRun,
@@ -190,8 +206,8 @@ async function readAttempt(
     return true;
   });
   if (paged === "cut") return "cut";
-  // The run (or the attempt) was deleted after it was listed: nothing to read, and not a failure.
-  if (paged === "gone") return [];
+  // The run (or the attempt) was deleted after it was listed: not a failure. The jobs of the pages read
+  // before it vanished are kept (none when the first page answered 404), and the attempt counts as read.
   const records: JobRecord[] = [];
   for (const job of jobs) {
     const record = toRecord({ repo: ctx.repo, run, attempt, pr }, job);
@@ -228,6 +244,7 @@ async function readRun(ctx: Ctx, run: ApiRun): Promise<"done" | "cut"> {
   const pr = await pullFor(ctx, run);
   if (pr === "cut") return "cut";
   const records: JobRecord[] = [];
+  const reported: ReadAttempt[] = [];
   let result: "done" | "cut" = "done";
   for (const attempt of attempts) {
     const read = await readAttempt(ctx, run, attempt, pr);
@@ -236,12 +253,22 @@ async function readRun(ctx: Ctx, run: ApiRun): Promise<"done" | "cut"> {
       break;
     }
     records.push(...read);
+    reported.push({
+      repo: ctx.repo,
+      runId: run.id,
+      runAttempt: attempt,
+      conclusion: run.conclusion,
+      createdAt: run.createdAt,
+      latestAttempt: run.runAttempt,
+      jobCount: read.length,
+    });
   }
   // The attempts read before a rate limit are kept: the next read starts after them.
   if (records.length > 0) {
     ctx.records.push(...records);
     await ctx.onRecords(records);
   }
+  if (reported.length > 0) await ctx.onAttempts(reported);
   return result;
 }
 
@@ -256,7 +283,8 @@ function heldByRun(held: readonly HeldAttempt[]): Map<number, Set<number>> {
 }
 
 /**
- * Read a repo's Actions history since a date into job records. The run listing carries no `created`
+ * Read a repo's Actions history since a date into job records, and report each attempt read (jobs or
+ * none) through `onAttempts`. The run listing carries no `created`
  * filter (GitHub caps a filtered listing at 1,000 results); it is newest first, so paging stops at the
  * first run older than `since`. Attempts in `held`, and the latest attempt of a run that has not
  * completed, are not fetched. A rate limit ends the read and returns what was read, marked cut short;
@@ -274,6 +302,9 @@ export async function readGitHubActions(
     held: heldByRun(options.held ?? []),
     records: [],
     onRecords: options.onRecords ?? (async () => {}),
+    onAttempts: options.onAttempts ?? (async () => {}),
+    running: new Set(),
+    listed: new Map(),
   };
   let cutShort = false;
   const listed = await eachPage(
@@ -284,6 +315,8 @@ export async function readGitHubActions(
       for (const item of items) {
         const run = parseRun(item);
         if (Date.parse(run.createdAt) < sinceMs) return false;
+        ctx.listed.set(run.id, { createdAt: run.createdAt, runAttempt: run.runAttempt });
+        if (run.status !== "completed") ctx.running.add(run.id);
         if ((await readRun(ctx, run)) === "cut") {
           cutShort = true;
           return false;
@@ -295,7 +328,12 @@ export async function readGitHubActions(
   // The runs listing itself missing is a wrong repo, not a deleted run.
   if (listed === "gone")
     throw new GitHubApiError(404, `${API_BASE}/repos/${options.repo}/actions/runs`);
-  return { records: ctx.records, cutShort: cutShort || listed === "cut" };
+  return {
+    records: ctx.records,
+    cutShort: cutShort || listed === "cut",
+    running: ctx.running,
+    listed: ctx.listed,
+  };
 }
 
 interface ReadJobLogOptions {

@@ -8,6 +8,7 @@ import {
   type RepoScan,
 } from "@hackcove/flakeslash-engine";
 import pkg from "../package.json" with { type: "json" };
+import { coverageLine } from "./coverage-line.ts";
 import { catalogueJson, catalogueOf, writeReportFile } from "./catalogue-output.ts";
 import type { ReportInput } from "./report-html.ts";
 import { summarizeExplanations, type Explanations } from "./explanations.ts";
@@ -61,7 +62,7 @@ Exit codes: 0 ok, 1 the run failed (an outage, a refused token), 2 a usage error
 `;
 
 function summarize(scan: RepoScan): string {
-  const lines = [scan.repo, `  new jobs: ${scan.newJobs}`];
+  const lines = [scan.repo, `  new jobs: ${scan.newJobs}`, `  ${coverageLine(scan.coverage)}`];
   lines.push(`  logs kept: ${scan.logsKept}, expired: ${scan.logsGone}`);
   if (scan.logsLeft > 0) {
     lines.push(`  ${scan.logsLeft} logs left for the next scan (GitHub said try later)`);

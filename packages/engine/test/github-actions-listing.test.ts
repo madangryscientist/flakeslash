@@ -141,6 +141,8 @@ describe("readGitHubActions: limits and failures", () => {
     expect(await readGitHubActions({ repo: REPO, since, fetch: gh.fetch })).toEqual({
       records: [],
       cutShort: true,
+      running: new Set(),
+      listed: new Map(),
     });
   });
 

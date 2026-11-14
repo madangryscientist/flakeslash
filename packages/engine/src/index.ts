@@ -55,9 +55,13 @@ export {
   type ModelResult,
 } from "./model.ts";
 
+export type { ReadAttempt } from "./providers/github-attempt.ts";
+
 export { isRunner } from "./providers/github-runner.ts";
 
 export { GitHubApiError } from "./providers/github-api.ts";
+
+export { runCoverage, type RunCoverage } from "./coverage.ts";
 
 export { scanRepo, type RepoScan } from "./pipeline.ts";
 

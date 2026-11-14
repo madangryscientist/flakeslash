@@ -41,6 +41,8 @@ export interface ApiRun {
   createdAt: string;
   /** GitHub's run `status`: `completed` once the latest attempt has ended, otherwise it may still gain jobs. */
   status: string;
+  /** GitHub's run `conclusion` (the latest attempt's), null until the run has one. */
+  conclusion: string | null;
 }
 
 export function parseRun(value: unknown): ApiRun {
@@ -60,6 +62,7 @@ export function parseRun(value: unknown): ApiRun {
     runAttempt: num(run.run_attempt) ?? 1,
     createdAt,
     status,
+    conclusion: str(run.conclusion),
   };
 }
 
