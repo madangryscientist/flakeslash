@@ -1,6 +1,6 @@
 /**
  * The FlakeSlash engine: flake detection. It reads a repo's GitHub Actions history, keeps it in a
- * `Store` and decides which jobs are flaky. The CLI, the web app and the site import from here.
+ * `Store` and decides which jobs are flaky. The CLI and the web app import from here.
  */
 export const ENGINE_NAME = "flakeslash-engine";
 

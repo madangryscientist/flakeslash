@@ -1,12 +1,11 @@
 # FlakeSlash: repo conventions
 
 FlakeSlash is a source-available tool for finding flaky tests: detect them in an engine, work with them
-from a CLI and a hosted dashboard. No product domain is chosen yet, so nothing is routed anywhere.
+from a CLI and a hosted dashboard. The marketing page is https://slashslash.build/flakeslash, built in the slashslash repo; the dashboard has no domain yet, so nothing in this repo is routed.
 
-**This repository is a skeleton.** It has the structure, the gate and the CI, and no product
-features. The engine exports a name and a version; the dashboard and the site each render one page.
-Flake detection, CI readers, storage and the API arrive as their own tickets, and
-[`docs/product.md`](docs/product.md) is the design they build to.
+**Built so far:** the engine and the `flakeslash` CLI do the local scan, and the dashboard renders one
+placeholder page. The server, upload and storage beyond the local SQLite store arrive as their own
+tickets, and [`docs/product.md`](docs/product.md) is the design they build to.
 
 This file is the operating agreement for contributors and agents working here: the gate, the landing
 rule and the invariants. Keep it accurate.
@@ -21,10 +20,9 @@ runs on the system toolchain, so moon never downloads Bun or runs `bun install`.
 
 | Project | Path | What it is |
 | --- | --- | --- |
-| `engine` | `packages/engine` | flake detection (a stub today) |
+| `engine` | `packages/engine` | flake detection |
 | `cli` | `packages/cli` | the `flakeslash` bin: argv, stdout and exit codes, over `@hackcove/flakeslash-engine` |
 | `web` | `apps/web` | the dashboard: TanStack Start on Cloudflare Workers, D1 via Drizzle (one placeholder table) |
-| `site` | `apps/site` | the public site: TanStack Start on a Worker, every page prerendered; no D1, no secrets |
 | `scripts` | `scripts` | `check-slop.ts`, `test-tmp-scope.ts` (typecheck + lint only) |
 
 `bunfig.toml` sets `[install] linker = "isolated"` and `globalStore = true`: a package sees its own declared dependencies and
@@ -41,8 +39,8 @@ bun run typecheck                 # moon run :typecheck  (tsc, strict)
 bun run lint                      # moon run :lint  (oxlint --type-aware --deny-warnings + check-slop)
 bun run format:check              # oxfmt --check  (`bun run format` fixes)
 bun run test                      # moon run :test  (Vitest under the Bun runtime)
-bun run build                     # moon run :build  (cli bundle, web, site)
-bun run test:e2e                  # moon run :test-e2e  (Playwright, web and site)
+bun run build                     # moon run :build  (cli bundle, web)
+bun run test:e2e                  # moon run :test-e2e  (Playwright, web)
 ```
 
 One project: `bunx moon run engine:test`, `bunx moon run cli:lint`. A task id cannot hold a colon, so
@@ -68,12 +66,11 @@ in CI), a failed run is never cached, and `--force` reruns it.
 When `web:test-e2e` runs, it builds with the e2e env on a fresh local D1 and leaves that build behind,
 so run `bunx moon run web:build --force` after it: a plain `bun run build` is a cache hit (`dist` is
 not an input), and moon does not restore the output it cached when the hash matches. CI's apps job
-runs `web:build --force` for the same reason. A change to `apps/web` or `apps/site` also runs the deploy dry runs (from
+runs `web:build --force` for the same reason. A change to `apps/web` also runs the deploy dry run (from
 the worktree root; they need no Cloudflare credentials):
 
 ```bash
 (cd apps/web && bunx wrangler deploy --dry-run --outdir "$TMPDIR/fl-web-dry")
-(cd apps/site && bunx wrangler deploy --dry-run --outdir "$TMPDIR/fl-site-dry")
 ```
 
 First time on a machine: `(cd apps/web && bunx playwright install chromium-headless-shell)`; run it inside a workspace so it takes the repo's Playwright version.
@@ -91,10 +88,9 @@ the drizzle migrations. Add a pattern when a new generator appears. `**/*.md` is
 
 ## Cloudflare, domains and publishing are human steps
 
-The skeleton adds no Worker route and no custom domain: no domain is chosen. The `D1` binding in
+The dashboard has no Worker route and no custom domain yet. The `D1` binding in
 `apps/web/wrangler.jsonc` carries a placeholder id. Creating the D1 database, the Worker routes, and
-the first npm publish each wait for the maintainer's yes. The site emits no canonical link until a
-domain exists.
+the first npm publish each wait for the maintainer's yes.
 
 ## Landing
 
@@ -116,6 +112,6 @@ domain exists.
    `styles.css`.
    The local `report.html` that `flakeslash scan` writes is a self-contained file with its own inline
    styles; it is outside this invariant, which covers `apps/` only.
-4. **A secret is read from the environment, never from the tree.** The site holds none.
+4. **A secret is read from the environment, never from the tree.**
 5. **Migrations are additive.** `drizzle-kit generate` writes the `.sql` and its `meta/` snapshot
    together (`bun run db:generate` in `apps/web`); never hand-write one.

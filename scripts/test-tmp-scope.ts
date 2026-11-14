@@ -1,5 +1,5 @@
 /**
- * Test `globalSetup` shared by every project (Vitest, and Playwright for `apps/web` and `apps/site`).
+ * Test `globalSetup` shared by every project (Vitest, and Playwright for `apps/web`).
  * It points `TMPDIR` at one fresh directory for the run and removes it afterwards, so whatever a
  * test (or the code it drives: Playwright profiles, Chromium) leaves in the temp dir goes with the
  * run, even when a test fails or forgets its own cleanup. /tmp is a quota'd tmpfs on the dev
