@@ -25,9 +25,15 @@ jobs:
     name: Gate (typecheck, lint, format, test)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # moon 2.6.5 diffs the head against the base branch before any task runs, even for a plain
+      # `moon run`, and the checkout has no local `main`, so it names the remote ref. That needs the
+      # full history (fetch-depth: 0 below).
+      MOON_BASE: origin/main
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
@@ -61,7 +67,7 @@ jobs:
           fi
           # The apps and packages (what they import), plus what decides how they install and run.
           if git diff --name-only "origin/$BASE_REF...HEAD" \
-            | grep -qE '^(apps/|packages/|bun\.lock$|bunfig\.toml$|\.node-version$|\.github/workflows/ci\.yml$)'; then
+            | grep -qE '^(apps/|packages/|\.moon/|bun\.lock$|bunfig\.toml$|\.node-version$|\.github/workflows/ci\.yml$)'; then
             echo "apps=true" >> "$GITHUB_OUTPUT"
           else
             echo "apps=false" >> "$GITHUB_OUTPUT"
@@ -73,9 +79,15 @@ jobs:
     if: needs.changes.outputs.apps == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # moon 2.6.5 diffs the head against the base branch before any task runs, even for a plain
+      # `moon run`, and the checkout has no local `main`, so it names the remote ref. That needs the
+      # full history (fetch-depth: 0 below).
+      MOON_BASE: origin/main
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
@@ -87,13 +99,13 @@ jobs:
       - name: Install the Playwright browser
         working-directory: apps/web
         run: bunx playwright install --with-deps chromium-headless-shell
-      - run: bunx nx test:e2e web
-      - run: bunx nx build web
+      - run: bunx moon run web:test-e2e
+      - run: bunx moon run web:build
       - name: Web deploy dry run
         working-directory: apps/web
         run: bunx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/fl-web-dry"
-      - run: bunx nx build site
-      - run: bunx nx test:e2e site
+      - run: bunx moon run site:build
+      - run: bunx moon run site:test-e2e
       - name: Site deploy dry run
         working-directory: apps/site
         run: bunx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/fl-site-dry"

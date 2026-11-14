@@ -1,5 +1,5 @@
 node_modules/
-.nx/
+.moon/cache/
 
 # the flakeslash package's build output
 packages/cli/dist/

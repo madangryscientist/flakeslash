@@ -13,7 +13,11 @@ rule and the invariants. Keep it accurate.
 
 ## The gate
 
-A small Nx workspace on Bun workspaces:
+A small moon workspace (moon 2.6.5, pinned in the root `package.json`) on Bun workspaces.
+`.moon/workspace.yml` lists the projects, `.moon/tasks/*.yml` holds what they inherit (shared inputs
+and the Vitest `test` task), and each project has a `moon.yml`. There is no toolchain file: every task
+runs on the system toolchain, so moon never downloads Bun or runs `bun install`. Keep it that way (no
+`.moon/toolchains.yml`, `pipeline.installDependencies: false`):
 
 | Project | Path | What it is |
 | --- | --- | --- |
@@ -33,20 +37,26 @@ A change is green when all of these pass **from the worktree**:
 
 ```bash
 bun install                       # FIRST: a fresh worktree has no node_modules
-bun run typecheck                 # nx run-many -t typecheck  (tsc, strict)
-bun run lint                      # nx run-many -t lint  (oxlint --type-aware --deny-warnings + check-slop)
+bun run typecheck                 # moon run :typecheck  (tsc, strict)
+bun run lint                      # moon run :lint  (oxlint --type-aware --deny-warnings + check-slop)
 bun run format:check              # oxfmt --check  (`bun run format` fixes)
-bun run test                      # nx run-many -t test  (Vitest under the Bun runtime)
-bun run build                     # nx run-many -t build  (cli bundle, web, site)
-bun run test:e2e                  # nx run-many -t test:e2e  (Playwright, web and site)
+bun run test                      # moon run :test  (Vitest under the Bun runtime)
+bun run build                     # moon run :build  (cli bundle, web, site)
+bun run test:e2e                  # moon run :test-e2e  (Playwright, web and site)
 ```
 
-One project: `bunx nx test engine`, `bunx nx lint cli`. Nx caches in `.nx/`; add `--skip-nx-cache` to
-force a rerun. There is no Nx Cloud here. Lint rules are all errors; fix the code, do not disable a
+One project: `bunx moon run engine:test`, `bunx moon run cli:lint`. A task id cannot hold a colon, so
+the e2e task is `test-e2e` (`bunx moon run web:test-e2e`); the root script keeps the name `test:e2e`.
+moon caches in `.moon/cache` (gitignored; it cannot be moved); add `--force` to rerun a cached task.
+The root scripts run three tasks at a time (`--concurrency 3`). There is no remote cache. moon has no
+`^default`: every project is tagged `ts`, and `.moon/tasks/ts.yml` makes all of `packages/**` an
+input to every task, so a change to the engine re-runs every project's tasks. In CI, `moon run`
+diffs against the base branch before it runs anything, so each job that runs moon checks out the
+full history and sets `MOON_BASE: origin/main`. Lint rules are all errors; fix the code, do not disable a
 rule. A TODO carries an issue: `TODO(#123)`. Tests live in `packages/*/test/` and
 `apps/*/src/**/*.test.ts` and run with `bun --bun vitest`.
 
-`test:e2e web` builds with the e2e env on a fresh local D1 and leaves that build behind, so run
+`web:test-e2e` builds with the e2e env on a fresh local D1 and leaves that build behind, so run
 `bun run build` after it. A change to `apps/web` or `apps/site` also runs the deploy dry runs (from
 the worktree root; they need no Cloudflare credentials):
 
@@ -66,8 +76,6 @@ the drizzle migrations. Add a pattern when a new generator appears. `**/*.md` is
 - Every project's test run goes through `scripts/test-tmp-scope.ts` (a Vitest and Playwright
   `globalSetup`): `TMPDIR` is a fresh dir for the run and is removed after it. A new project's
   `vitest.config.ts` must list the same `globalSetup`.
-- `nx.json` sets `"useDaemonProcess": false`; the daemon installs `nx@latest` into `/tmp` and does
-  not clean it. Do not turn it on and do not run `nx daemon`.
 - Scratch goes under `$TMPDIR`, never a hardcoded `/tmp`.
 
 ## Cloudflare, domains and publishing are human steps
