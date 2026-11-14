@@ -101,8 +101,11 @@ function splitSteps(lines: string[]): string[][] {
   return steps;
 }
 
-/** A line that reports a pass: a `✓` or `✔` mark, or bun's plain `(pass)` reporter, first in the line. */
-const PASS_LINE = /^\s*(?:✓|✔|\(pass\))/;
+/**
+ * A line that reports a pass: a `✓` or `✔` mark, or bun's plain `(pass)` reporter, first in the line.
+ * Moon puts a right-aligned `<target> | ` in front of each task line, so one such prefix is allowed.
+ */
+const PASS_LINE = /^\s*(?:\S+ \| )?\s*(?:✓|✔|\(pass\))/;
 
 /** A zero failure or error count, such as bun's ` 0 fail` summary. It says nothing failed. */
 const ZERO_COUNT = /\b0 (?:fail|failed|failures|errors?)\b/gi;
