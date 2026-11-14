@@ -18,9 +18,14 @@ tasks:
     outputs:
       - "dist"
       - ".wrangler/deploy"
+  # Cached: the suite runs on localhost against the built `dist`, so its result depends on the
+  # inputs and the build's hash alone. `$CI` is an input because it turns on `forbidOnly`. No
+  # outputs: a pass leaves nothing a later step reads.
   test-e2e:
     command: "bun run playwright test"
+    # A task's own `inputs` replace the default project glob, so `**/*` is listed again.
+    inputs:
+      - "**/*"
+      - "$CI"
     deps:
       - "~:build"
-    options:
-      cache: false

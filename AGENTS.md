@@ -62,10 +62,13 @@ full history and sets `MOON_BASE: origin/main`. Lint rules are all errors; fix t
 rule. A TODO carries an issue: `TODO(#123)`. Tests live in `packages/*/test/` and
 `apps/*/src/**/*.test.ts` and run with `bun --bun vitest`.
 
-`web:test-e2e` builds with the e2e env on a fresh local D1 and leaves that build behind, so run
-`bunx moon run web:build --force` after it: a plain `bun run build` is a cache hit (`dist` is not an
-input), and moon does not restore the output it cached when the hash matches. CI's apps job runs
-`web:build --force` for the same reason. A change to `apps/web` or `apps/site` also runs the deploy dry runs (from
+Both e2e tasks are cached: a repeat run on unchanged code is a hit (locally and from the remote cache
+in CI), a failed run is never cached, and `--force` reruns it.
+
+When `web:test-e2e` runs, it builds with the e2e env on a fresh local D1 and leaves that build behind,
+so run `bunx moon run web:build --force` after it: a plain `bun run build` is a cache hit (`dist` is
+not an input), and moon does not restore the output it cached when the hash matches. CI's apps job
+runs `web:build --force` for the same reason. A change to `apps/web` or `apps/site` also runs the deploy dry runs (from
 the worktree root; they need no Cloudflare credentials):
 
 ```bash

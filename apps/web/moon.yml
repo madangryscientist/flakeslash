@@ -19,7 +19,12 @@ tasks:
       - "dist"
       - ".wrangler/deploy"
   # Its Playwright webServer builds with the e2e env itself, so it has no dependency on `build`.
+  # Cached: the suite runs on localhost against this project's own build, so its result depends on
+  # the inputs alone. `$CI` is an input because it turns on `forbidOnly`. No outputs: a pass leaves
+  # nothing a later step reads, so a hit restores nothing and leaves `dist` as it was.
   test-e2e:
     command: "bun run playwright test"
-    options:
-      cache: false
+    # A task's own `inputs` replace the default project glob, so `**/*` is listed again.
+    inputs:
+      - "**/*"
+      - "$CI"
