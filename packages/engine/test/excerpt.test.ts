@@ -183,6 +183,9 @@ describe("cutLog", () => {
   });
 });
 
+/** Moon's right-aligned `<target> | ` prefix on a task line. */
+const moonPrefix = (target: string) => `${target.padStart(20)} | `;
+
 describe("cutLog does not keep a pass as a failure", () => {
   it("keeps the failing test in a log of 2,000 passing tests named after failures", () => {
     const passing = Array.from(
@@ -243,5 +246,57 @@ describe("cutLog does not keep a pass as a failure", () => {
 
     expect(out).not.toContain("(pass) renderT3Status");
     expect(out).toContain("##[error]Process completed with exit code 1.");
+  });
+
+  it("does not keep moon-prefixed passing tests whose titles name failures, and keeps the failure", () => {
+    const passing = Array.from(
+      { length: 1_500 },
+      (_, i) =>
+        `${moonPrefix("cli-core:test")}(pass) renderT3Status (${i}) > an error and a timeout ${i} | 2 ms`,
+    );
+    const step = [
+      "##[group]Run moon run :test",
+      ...passing,
+      `${moonPrefix("cli-core:test")}(fail) lock holder waits out a timeout | 40 ms`,
+      `${moonPrefix("cli-core:test")}error: expected the lock to be free`,
+      "  × Task cli-core:test failed to run.",
+      "##[error]Process completed with exit code 1.",
+    ].join("\n");
+
+    const out = cutLog(step);
+
+    // Only the passing lines within the context window of the failure may survive, never the 1,500 others.
+    expect(out).not.toContain("renderT3Status (0) ");
+    expect(out.split("\n").filter((line) => line.includes("(pass)")).length).toBeLessThanOrEqual(8);
+    expect(out).toContain("(fail) lock holder waits out a timeout");
+    expect(out).toContain("error: expected the lock to be free");
+    expect(out).toContain("× Task cli-core:test failed to run.");
+    expect(out.length).toBeLessThanOrEqual(25_000);
+  });
+
+  it("still keeps a moon-prefixed failing line", () => {
+    const log = [
+      "##[group]Run moon run :test",
+      "                 cli-coord:test | (pass) quiet | 1 ms",
+      "                 cli-coord:test | (fail) a failing test | 3 ms",
+      "##[error]Process completed with exit code 1.",
+    ].join("\n");
+
+    const out = cutLog(log);
+
+    expect(out).toContain("cli-coord:test | (fail) a failing test | 3 ms");
+  });
+
+  it("still drops an unprefixed passing line with a failure word in its title", () => {
+    const log = [
+      "##[group]Run bun test",
+      "(pass) a timeout test | 4 ms",
+      ...Array.from({ length: 20 }, (_, i) => `quiet line ${i}`),
+      "##[error]Process completed with exit code 1.",
+    ].join("\n");
+
+    const out = cutLog(log);
+
+    expect(out).not.toContain("(pass) a timeout test");
   });
 });
