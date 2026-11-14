@@ -1,8 +1,14 @@
 name: CI
 
-# The gate from AGENTS.md, on a GitHub-hosted runner. No secrets are read, and the trigger is
-# `pull_request` (never `pull_request_target`), so a pull request from a fork runs with a read-only
-# token. Actions are pinned to a commit; the tag is in the comment.
+# The gate from AGENTS.md, on a GitHub-hosted runner. The trigger is `pull_request` (never
+# `pull_request_target`), so a pull request from a fork runs with a read-only token and no secrets.
+# Actions are pinned to a commit; the tag is in the comment.
+#
+# The only secrets are the moon remote cache tokens, passed as MOON_REMOTE_TOKEN to the steps that
+# run moon. A pull request reads with MOON_CACHE_READ_TOKEN (a repository secret) and its uploads are
+# refused with a warning. A push to main writes with MOON_CACHE_WRITE_TOKEN, which lives only in the
+# `moon-cache-write` environment that only main may deploy from. A fork sends no token; moon warns
+# about the 401 and runs on its local cache.
 
 on:
   pull_request:
@@ -23,6 +29,7 @@ env:
 jobs:
   gate:
     name: Gate (typecheck, lint, format, test)
+    environment: ${{ github.event_name == 'push' && 'moon-cache-write' || '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -41,9 +48,13 @@ jobs:
       - run: bun scripts/check-workflows.ts .github/workflows/*.yml
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
+        env: &moon-remote-token
+          MOON_REMOTE_TOKEN: ${{ github.event_name == 'push' && secrets.MOON_CACHE_WRITE_TOKEN || secrets.MOON_CACHE_READ_TOKEN }}
       - run: bun run lint
+        env: *moon-remote-token
       - run: bun run format:check
       - run: bun run test
+        env: *moon-remote-token
 
   changes:
     name: Did an app change?
@@ -75,6 +86,7 @@ jobs:
 
   apps:
     name: Apps gate (build, e2e, deploy dry run)
+    environment: ${{ github.event_name == 'push' && 'moon-cache-write' || '' }}
     needs: changes
     if: needs.changes.outputs.apps == 'true'
     runs-on: ubuntu-latest
@@ -100,12 +112,19 @@ jobs:
         working-directory: apps/web
         run: bunx playwright install --with-deps chromium-headless-shell
       - run: bunx moon run web:test-e2e
-      - run: bunx moon run web:build
+        env: *moon-remote-token
+      # --force: web:test-e2e left a dist built with the e2e env, and a cache hit here would not
+      # rebuild it, so the dry run below would check the e2e bundle. --force skips the cache read and
+      # still uploads on main.
+      - run: bunx moon run web:build --force
+        env: *moon-remote-token
       - name: Web deploy dry run
         working-directory: apps/web
         run: bunx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/fl-web-dry"
       - run: bunx moon run site:build
+        env: *moon-remote-token
       - run: bunx moon run site:test-e2e
+        env: *moon-remote-token
       - name: Site deploy dry run
         working-directory: apps/site
         run: bunx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/fl-site-dry"

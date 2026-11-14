@@ -48,7 +48,13 @@ bun run test:e2e                  # moon run :test-e2e  (Playwright, web and sit
 One project: `bunx moon run engine:test`, `bunx moon run cli:lint`. A task id cannot hold a colon, so
 the e2e task is `test-e2e` (`bunx moon run web:test-e2e`); the root script keeps the name `test:e2e`.
 moon caches in `.moon/cache` (gitignored; it cannot be moved); add `--force` to rerun a cached task.
-The root scripts run three tasks at a time (`--concurrency 3`). There is no remote cache. moon has no
+The root scripts run three tasks at a time (`--concurrency 3`). A shared moon remote cache (bazel-remote
+over HTTP, the `remote:` block in `.moon/workspace.yml`) sits behind a bearer token read from
+`MOON_REMOTE_TOKEN`. CI runs from this repo read it (a fork's pull request gets no secrets and runs
+without it), and only a push to main writes to it (the write token is in the `moon-cache-write`
+environment, deployable from `main` only). Locally moon only downloads
+(`localReadOnly`): set `MOON_REMOTE_TOKEN` to a read token for remote hits; unset, moon warns about a
+401 and runs on the local cache. moon has no
 `^default`: every project is tagged `ts`, and `.moon/tasks/ts.yml` makes all of `packages/**` an
 input to every task, so a change to the engine re-runs every project's tasks. In CI, `moon run`
 diffs against the base branch before it runs anything, so each job that runs moon checks out the
@@ -58,7 +64,8 @@ rule. A TODO carries an issue: `TODO(#123)`. Tests live in `packages/*/test/` an
 
 `web:test-e2e` builds with the e2e env on a fresh local D1 and leaves that build behind, so run
 `bunx moon run web:build --force` after it: a plain `bun run build` is a cache hit (`dist` is not an
-input), and moon does not restore the output it cached when the hash matches. A change to `apps/web` or `apps/site` also runs the deploy dry runs (from
+input), and moon does not restore the output it cached when the hash matches. CI's apps job runs
+`web:build --force` for the same reason. A change to `apps/web` or `apps/site` also runs the deploy dry runs (from
 the worktree root; they need no Cloudflare credentials):
 
 ```bash

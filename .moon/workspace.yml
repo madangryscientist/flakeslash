@@ -21,3 +21,15 @@ pipeline:
   installDependencies: false
 
 telemetry: false
+
+# A shared moon remote cache (bazel-remote over HTTP) behind a bearer token. moon sends
+# `Authorization: Bearer $MOON_REMOTE_TOKEN`; unset or empty sends no header, the host answers 401,
+# and the run carries on with the local cache only. A read token downloads; only CI pushes to main
+# hold the write token. Outside CI moon never uploads.
+remote:
+  api: "http"
+  host: "https://moon-cache.madangryscientist.com"
+  auth:
+    token: "MOON_REMOTE_TOKEN"
+  cache:
+    localReadOnly: true
