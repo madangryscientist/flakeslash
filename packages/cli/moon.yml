@@ -1,0 +1,19 @@
+$schema: "../../.moon/cache/schemas/project.json"
+
+tags: ["ts"]
+
+tasks:
+  typecheck:
+    command: "tsc -p packages/cli/tsconfig.json"
+    options:
+      runFromWorkspaceRoot: true
+  lint:
+    script: "oxlint --type-aware --deny-warnings packages/cli && bun scripts/check-slop.ts packages/cli"
+    options:
+      runFromWorkspaceRoot: true
+  build:
+    command: "bun build packages/cli/src/index.ts --outfile packages/cli/dist/index.js --target bun"
+    outputs:
+      - "dist"
+    options:
+      runFromWorkspaceRoot: true

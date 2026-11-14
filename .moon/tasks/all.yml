@@ -1,0 +1,18 @@
+# Inherited by every project. Root files every task's result depends on, so a change to one is
+# never a cache hit.
+$schema: "../cache/schemas/tasks.json"
+
+implicitInputs:
+  - "/package.json"
+  - "/bun.lock"
+  - "/bunfig.toml"
+  - "/tsconfig.base.json"
+  - "/.oxlintrc.json"
+  - "/scripts/check-slop.ts"
+  - "/.tool-versions"
+
+# The gate runs every task and relies on the cache, never on affected detection: without this, a
+# `moon run` in CI would skip the tasks it judges unaffected against the base branch. (The base diff
+# itself still runs; ci.yml gives it full history and MOON_BASE.)
+taskOptions:
+  runInCI: "always"

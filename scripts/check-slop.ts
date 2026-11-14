@@ -1,6 +1,6 @@
 /**
  * The anti-slop rules Oxlint has no rule for: a TODO/FIXME with no ticket ref, and
- * commented-out code. Each project's Nx `lint` target runs it on that project's
+ * commented-out code. Each project's moon `lint` task runs it on that project's
  * dir after oxlint (`bun scripts/check-slop.ts packages/engine`); any hit fails the gate.
  */
 import { globSync, readFileSync } from "node:fs";

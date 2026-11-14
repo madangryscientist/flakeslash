@@ -1,0 +1,13 @@
+$schema: "../../.moon/cache/schemas/project.json"
+
+tags: ["ts"]
+
+tasks:
+  typecheck:
+    command: "tsc -p packages/engine/tsconfig.json"
+    options:
+      runFromWorkspaceRoot: true
+  lint:
+    script: "oxlint --type-aware --deny-warnings packages/engine && bun scripts/check-slop.ts packages/engine"
+    options:
+      runFromWorkspaceRoot: true

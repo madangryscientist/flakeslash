@@ -1,0 +1,23 @@
+$schema: "../../.moon/cache/schemas/project.json"
+
+tags: ["ts"]
+
+# Their tools (tsr, vite, playwright) live in the app's own node_modules/.bin, which moon does not
+# put on PATH, so `bun run` finds them from the app's directory.
+tasks:
+  typecheck:
+    script: "bun run tsr generate && tsc --noEmit"
+  lint:
+    script: "oxlint --type-aware --deny-warnings apps/site && bun scripts/check-slop.ts apps/site"
+    options:
+      runFromWorkspaceRoot: true
+  build:
+    command: "bun run vite build"
+    outputs:
+      - "dist"
+  test-e2e:
+    command: "bun run playwright test"
+    deps:
+      - "~:build"
+    options:
+      cache: false
