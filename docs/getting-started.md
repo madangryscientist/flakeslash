@@ -1,14 +1,15 @@
 # Getting started
 
-FlakeSlash is a skeleton: there is nothing to detect yet ([the design](product.md) says what is coming). What you can do today:
+FlakeSlash is in alpha: changing fast, so expect breaking changes between versions. Today it runs on your machine: `flakeslash scan` reads a repo's GitHub Actions history and ranks its flaky tests ([the design](product.md) says what is coming). To try it from a checkout:
 
 ```bash
 bun install
 bun run flakeslash --version     # flakeslash-engine 0.0.0
 bun run flakeslash --help
+GITHUB_TOKEN=<token> bun run flakeslash scan <owner/repo>
 ```
 
-The dashboard (`apps/web`) and the site (`apps/site`) each have a `dev` script: run `bun run dev` in the app's directory.
+The dashboard (`apps/web`) has a `dev` script: run `bun run dev` in the app's directory.
 
 ## Explanations from a model
 

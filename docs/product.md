@@ -5,8 +5,7 @@ dead runners, timeouts and out-of-memory errors. For each issue it answers why i
 and which commits, PRs and teams it affects. It works across CI systems, so an organisation that runs
 GitHub Actions, CircleCI and Jenkins has one view of how reliable its CI is.
 
-It is source-available under the Elastic License 2.0 and self-hostable. This file is the agreed design; none of it is built yet except
-the skeleton. A change to the design changes this file in the same pull request.
+It is source-available under the Elastic License 2.0 and self-hostable. This file is the agreed design. Built so far: the engine and the `flakeslash` CLI (local scan, issues and report.html); the server, upload and dashboard are not built yet. A change to the design changes this file in the same pull request.
 
 ## How data gets in
 

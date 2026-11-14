@@ -3,7 +3,7 @@ Copyright 2026 Jacobus Langner and the FlakeSlash contributors
 
 FlakeSlash is licensed under the Elastic License 2.0; see LICENSE.
 
-The dashboard and the site use the Catppuccin Mocha colour palette through
+The dashboard uses the Catppuccin Mocha colour palette through
 @hackcove/theme-catppuccin-mocha.
 
 Catppuccin Mocha palette: MIT

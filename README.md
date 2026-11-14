@@ -2,16 +2,15 @@
 
 Source-available flaky-test detection you can run yourself, under the Elastic License 2.0.
 
-> **Status: skeleton.** The repo has its structure, gate and CI, and no product features yet.
+> **Status: alpha.** Changing fast. Expect breaking changes between versions. The `flakeslash` CLI scans GitHub Actions history on your machine; the server and dashboard are not built yet.
 
 ## Layout
 
 | Path | What it is |
 | --- | --- |
-| `packages/engine` | flake detection (stub) |
+| `packages/engine` | flake detection |
 | `packages/cli` | the `flakeslash` command |
 | `apps/web` | the dashboard: TanStack Start on Cloudflare Workers, D1 via Drizzle |
-| `apps/site` | the public site, prerendered |
 
 ## Develop
 

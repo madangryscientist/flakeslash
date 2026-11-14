@@ -121,10 +121,3 @@ jobs:
       - name: Web deploy dry run
         working-directory: apps/web
         run: bunx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/fl-web-dry"
-      - run: bunx moon run site:build
-        env: *moon-remote-token
-      - run: bunx moon run site:test-e2e
-        env: *moon-remote-token
-      - name: Site deploy dry run
-        working-directory: apps/site
-        run: bunx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/fl-site-dry"
