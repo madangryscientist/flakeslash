@@ -57,7 +57,8 @@ rule. A TODO carries an issue: `TODO(#123)`. Tests live in `packages/*/test/` an
 `apps/*/src/**/*.test.ts` and run with `bun --bun vitest`.
 
 `web:test-e2e` builds with the e2e env on a fresh local D1 and leaves that build behind, so run
-`bun run build` after it. A change to `apps/web` or `apps/site` also runs the deploy dry runs (from
+`bunx moon run web:build --force` after it: a plain `bun run build` is a cache hit (`dist` is not an
+input), and moon does not restore the output it cached when the hash matches. A change to `apps/web` or `apps/site` also runs the deploy dry runs (from
 the worktree root; they need no Cloudflare credentials):
 
 ```bash

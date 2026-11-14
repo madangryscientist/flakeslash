@@ -67,7 +67,7 @@ jobs:
           fi
           # The apps and packages (what they import), plus what decides how they install and run.
           if git diff --name-only "origin/$BASE_REF...HEAD" \
-            | grep -qE '^(apps/|packages/|\.moon/|bun\.lock$|bunfig\.toml$|\.node-version$|\.github/workflows/ci\.yml$)'; then
+            | grep -qE '^(apps/|packages/|\.moon/|package\.json$|bun\.lock$|bunfig\.toml$|\.node-version$|\.github/workflows/ci\.yml$)'; then
             echo "apps=true" >> "$GITHUB_OUTPUT"
           else
             echo "apps=false" >> "$GITHUB_OUTPUT"
