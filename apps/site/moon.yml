@@ -13,8 +13,11 @@ tasks:
       runFromWorkspaceRoot: true
   build:
     command: "bun run vite build"
+    # The Cloudflare plugin also writes .wrangler/deploy/config.json, the redirect that vite preview
+    # and wrangler deploy read; without it a cache hit restores dist they cannot find.
     outputs:
       - "dist"
+      - ".wrangler/deploy"
   test-e2e:
     command: "bun run playwright test"
     deps:
