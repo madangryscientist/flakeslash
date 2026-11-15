@@ -245,8 +245,8 @@ export const flakeRecords = sqliteTable(
 );
 
 /**
- * One repo's jobs on one day (`YYYY-MM-DD`, UTC, the day of the run's `created_at`) on one provider and
- * runner kind. Written once, whole, when the day's runs expire: by then no new run can arrive for it.
+ * One repo's jobs on one day (`YYYY-MM-DD`, UTC, the day of the run's `created_at`; for a run whose jobs
+ * have no `attempts` row, the day of its jobs' earliest time) on one provider and runner kind. Written once, whole, when the day's runs expire: by then no new run can arrive for it.
  */
 export const dailyTotals = sqliteTable(
   "daily_totals",
