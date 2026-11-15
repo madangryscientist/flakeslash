@@ -1,5 +1,6 @@
 import {
   isRepoName,
+  type ClaudeRun,
   type FetchLike,
   type ModelClientOptions,
   type ModelFetch,
@@ -15,13 +16,20 @@ export interface Deps {
   fetch: FetchLike;
   /** The model endpoint's POST; the real `fetch` unless a test stands in. */
   modelFetch?: ModelFetch;
+  /** Runs the local `claude` CLI for `--model-via claude-code`; the real one unless a test stands in. */
+  claudeRun?: ClaudeRun;
   env: Readonly<Record<string, string | undefined>>;
   /** False lets the store skip waiting for the disk, as a test with a throwaway store wants. Default true. */
   durable?: boolean;
 }
 
-/** The model endpoint a scan may call: everything `createModelClient` needs but the fetch. */
-export type ModelConfig = Omit<ModelClientOptions, "fetch">;
+/**
+ * How a scan reaches a model: an OpenAI-compatible endpoint (everything `createModelClient` needs
+ * but the fetch), or the local `claude` CLI.
+ */
+export type ModelConfig =
+  | ({ via: "http" } & Omit<ModelClientOptions, "fetch">)
+  | { via: "claude-code"; model: string; capUsd: number };
 
 export interface ScanArgs {
   repos: string[];
@@ -35,7 +43,15 @@ export interface ScanArgs {
 /** The model flags that mean nothing without an endpoint, in the order they are checked. */
 const MODEL_FLAGS: readonly string[] = ["--model", "--cap-usd", "--price-in", "--price-out"];
 /** Every scan flag that takes a value. */
-const VALUE_FLAGS: readonly string[] = ["--since", "--store", "--model-url", ...MODEL_FLAGS];
+const VALUE_FLAGS: readonly string[] = [
+  "--since",
+  "--store",
+  "--model-url",
+  "--model-via",
+  ...MODEL_FLAGS,
+];
+/** What `--model-via claude-code` refuses: the endpoint's flags, which mean nothing to it. */
+const HTTP_ONLY_FLAGS: readonly string[] = ["--model-url", "--price-in", "--price-out"];
 
 function sinceFrom(since: string | undefined): string {
   if (since === undefined) return new Date(Date.now() - DEFAULT_SINCE_DAYS * DAY_MS).toISOString();
@@ -93,7 +109,29 @@ function endpointFrom(values: ReadonlyMap<string, string>, env: Deps["env"]): st
   return named === undefined || named === "" ? undefined : named;
 }
 
+/** `--model-via claude-code`: a model and a cap, and nothing of the endpoint. */
+function claudeCodeFrom(values: ReadonlyMap<string, string>, env: Deps["env"]): ModelConfig {
+  const via = values.get("--model-via");
+  if (via !== "claude-code") {
+    throw new UsageError(`--model-via "${via ?? ""}" is not known; the one way is claude-code`);
+  }
+  const stray = HTTP_ONLY_FLAGS.find((flag) => values.has(flag));
+  if (stray !== undefined) throw new UsageError(`${stray} cannot go with --model-via claude-code`);
+  if (env.FLAKESLASH_MODEL_KEY !== undefined && env.FLAKESLASH_MODEL_KEY !== "") {
+    throw new UsageError("FLAKESLASH_MODEL_KEY cannot go with --model-via claude-code");
+  }
+  for (const flag of ["--model", "--cap-usd"]) {
+    if (!values.has(flag)) throw new UsageError(`${flag} is required with --model-via claude-code`);
+  }
+  return {
+    via: "claude-code",
+    model: values.get("--model") ?? "",
+    capUsd: numberFlag(values, "--cap-usd", (n) => n > 0, "above 0"),
+  };
+}
+
 function modelFrom(values: ReadonlyMap<string, string>, env: Deps["env"]): ModelConfig | undefined {
+  if (values.has("--model-via")) return claudeCodeFrom(values, env);
   const url = endpointFrom(values, env);
   if (url === undefined) {
     const stray = MODEL_FLAGS.find((flag) => values.has(flag));
@@ -105,6 +143,7 @@ function modelFrom(values: ReadonlyMap<string, string>, env: Deps["env"]): Model
     if (!values.has(flag)) throw new UsageError(`${flag} is required with --model-url`);
   }
   return {
+    via: "http",
     url: baseUrl,
     key: env.FLAKESLASH_MODEL_KEY === "" ? undefined : env.FLAKESLASH_MODEL_KEY,
     model: values.get("--model") ?? "",

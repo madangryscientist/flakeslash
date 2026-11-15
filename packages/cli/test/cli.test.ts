@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import pkg from "../package.json" with { type: "json" };
 import type { FetchLike } from "@hackcove/flakeslash-engine";
 import { run } from "../src/cli.ts";
+import { claudeEnv } from "../src/claude-run.ts";
 import { parseScanArgs } from "../src/scan-args.ts";
 
 describe("run", () => {
@@ -119,6 +120,7 @@ describe("the model flags", () => {
       FLAKESLASH_MODEL_HEADERS: "x-opencode-session: abc: def\n\n  X-Other :  v  \r\n",
     });
     expect(parsed.model).toEqual({
+      via: "http",
       url: "https://llm.example/v1",
       key: "k",
       model: "m",
@@ -147,7 +149,7 @@ describe("the model flags", () => {
       { FLAKESLASH_MODEL_URL: "https://other.example" },
     );
     expect(parsed.model).toMatchObject({ url: "https://llm.example/v1", priceIn: 0, priceOut: 0 });
-    expect(parsed.model?.key).toBeUndefined();
+    expect(parsed.model?.via === "http" && parsed.model.key).toBeUndefined();
   });
 
   it("leaves model undefined, as before, when no endpoint is named", () => {
@@ -155,5 +157,56 @@ describe("the model flags", () => {
     // A key or headers in the environment mean nothing without an endpoint.
     const env = { FLAKESLASH_MODEL_KEY: "k", FLAKESLASH_MODEL_HEADERS: "no colon here" };
     expect(parseScanArgs(["acme/app"], env).model).toBeUndefined();
+  });
+});
+
+describe("--model-via claude-code", () => {
+  const VIA = ["--model-via", "claude-code", "--model", "m", "--cap-usd", "1"];
+
+  it.each([
+    ["--model-url", [...VIA, "--model-url", "https://llm.example/v1"], {}, "--model-url"],
+    ["--price-in", [...VIA, "--price-in", "1"], {}, "--price-in"],
+    ["--price-out", [...VIA, "--price-out", "1"], {}, "--price-out"],
+    ["no --model", ["--model-via", "claude-code", "--cap-usd", "1"], {}, "--model is required"],
+    ["no --cap-usd", ["--model-via", "claude-code", "--model", "m"], {}, "--cap-usd is required"],
+    ["a cap of 0", [...VIA.slice(0, 5), "0"], {}, "--cap-usd"],
+    ["FLAKESLASH_MODEL_KEY", VIA, { FLAKESLASH_MODEL_KEY: "k" }, "FLAKESLASH_MODEL_KEY"],
+    ["another way", ["--model-via", "other", "--model", "m", "--cap-usd", "1"], {}, "--model-via"],
+  ])("exits 2 and names the flag with %s", async (_name, args, env, expected) => {
+    const { code, stderr } = await scan(args, env);
+    expect(code).toBe(2);
+    expect(stderr).toContain(expected);
+  });
+
+  it("builds a model and a cap and nothing of the endpoint", () => {
+    expect(
+      parseScanArgs(["acme/app", ...VIA], { FLAKESLASH_MODEL_URL: "https://x" }).model,
+    ).toEqual({ via: "claude-code", model: "m", capUsd: 1 });
+  });
+
+  it("is listed in --help", async () => {
+    let out = "";
+    const write = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      out += String(chunk);
+      return true;
+    });
+    try {
+      await run(["--help"]);
+    } finally {
+      write.mockRestore();
+    }
+    expect(out).toContain("--model-via claude-code");
+  });
+});
+
+describe("the claude runner's environment", () => {
+  it("leaves out an Anthropic key, so claude uses the signed-in account", () => {
+    const env = claudeEnv({
+      PATH: "/bin",
+      ANTHROPIC_API_KEY: "k",
+      ANTHROPIC_AUTH_TOKEN: "t",
+      UNSET: undefined,
+    });
+    expect(env).toEqual({ PATH: "/bin" });
   });
 });

@@ -5,7 +5,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { FetchLike, ModelFetch } from "@hackcove/flakeslash-engine";
+import type { ClaudeRun, FetchLike, ModelFetch } from "@hackcove/flakeslash-engine";
 import { afterEach, beforeEach, vi } from "vitest";
 import {
   REPO,
@@ -109,7 +109,7 @@ export function useScan() {
       args: string[],
       gh: { fetch: FetchLike },
       env: Record<string, string | undefined> = { GITHUB_TOKEN: "ghp_test" },
-      modelFetch?: ModelFetch,
+      model?: ModelFetch | { claudeRun: ClaudeRun },
     ): Promise<Outcome> {
       let out = "";
       let err = "";
@@ -128,7 +128,7 @@ export function useScan() {
           env,
           // The store is thrown away with the test, so no write need wait for the disk.
           durable: false,
-          ...(modelFetch === undefined ? {} : { modelFetch }),
+          ...(typeof model === "function" ? { modelFetch: model } : model),
         });
         return { code, out, err };
       } finally {
