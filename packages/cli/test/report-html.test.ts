@@ -23,6 +23,7 @@ const ranked: RankedIssue = {
   ranCommits: 2,
   suspect: false,
   latestUrl: URL,
+  latestFailure: null,
 };
 
 describe("reportHtml", () => {
@@ -80,6 +81,79 @@ describe("reportHtml", () => {
     }
   });
 
+  describe("PR list", () => {
+    it("lists the first 5 of 8 PRs, then says how many more", () => {
+      const html = reportHtml(withPrs(8));
+      expect(prLinks(html)).toEqual([1, 2, 3, 4, 5].map((n) => `acme/app #${n}`));
+      expect(html).toContain("and 3 more");
+    });
+
+    it("lists all 5 of 5 PRs with no more text", () => {
+      const html = reportHtml(withPrs(5));
+      expect(prLinks(html)).toHaveLength(5);
+      expect(html).not.toContain(" more</dd>");
+      expect(html).not.toMatch(/and \d+ more/);
+    });
+  });
+
+  describe("excerpt window", () => {
+    /** 120 lines, `line 1` to `line 120`, with line 90 holding the failure. */
+    const LOG = Array.from({ length: 120 }, (_, i) =>
+      i === 89 ? "FAIL test/upload.test.ts > uploads the file" : `line ${i + 1}`,
+    ).join("\n");
+
+    it("opens 5 lines above the line holding the title, moved up so the box is full", () => {
+      const shown = shownLines(LOG, { title: "uploads the file", errorLine: "not in the log" });
+      expect(shown).toHaveLength(40);
+      expect(shown[0]).toBe("line 81");
+      expect(shown.at(-1)).toBe("line 120");
+      expect(shown).toContain("FAIL test/upload.test.ts &gt; uploads the file");
+    });
+
+    it("anchors on the error line when the title is not found", () => {
+      const shown = shownLines(LOG, { title: "not in the log", errorLine: "test/upload.test.ts" });
+      expect(shown[0]).toBe("line 81");
+      expect(shown.at(-1)).toBe("line 120");
+      expect(shown).toContain("FAIL test/upload.test.ts &gt; uploads the file");
+    });
+
+    it("starts at the sixth line above when the failure is not near the end", () => {
+      const early = LOG.replace("line 20\n", "Error: boom\n");
+      const shown = shownLines(early, { title: null, errorLine: "Error: boom" });
+      expect(shown[0]).toBe("line 15");
+      expect(shown[5]).toBe("Error: boom");
+      expect(shown).toHaveLength(40);
+    });
+
+    it("keeps fewer lines above the failure when they are long enough to wrap it out of the box", () => {
+      const dots = ".".repeat(80);
+      const long = LOG.split("\n")
+        .map((line, i) => (i >= 84 && i < 89 ? dots : line))
+        .join("\n");
+      const shown = shownLines(long, { title: "uploads the file", errorLine: "" });
+      // Each 80-character line is 3 phone rows: 4 of them make 12, the most allowed above.
+      expect(shown.slice(0, 5)).toEqual([
+        dots,
+        dots,
+        dots,
+        dots,
+        "FAIL test/upload.test.ts &gt; uploads the file",
+      ]);
+    });
+
+    it("shows the last 40 lines with no title and an empty error line", () => {
+      const shown = shownLines(LOG, { title: null, errorLine: "" });
+      expect(shown).toHaveLength(40);
+      expect(shown[0]).toBe("line 81");
+      expect(shown.at(-1)).toBe("line 120");
+    });
+
+    it("shows the last 40 lines when nothing matches", () => {
+      const shown = shownLines(LOG.replace("FAIL", "line"), null);
+      expect(shown[0]).toBe("line 81");
+    });
+  });
+
   describe("flake rate text", () => {
     it("prints <1% for a rate above 0 and under 1%, with the count beside it", () => {
       expect(rateLine(1 / 348, 1, 348)).toBe("&lt;1% (1 of 348 commits)");
@@ -119,4 +193,37 @@ function rateLine(rate: number, flakyCommits: number, ranCommits: number): strin
     reportHtml(withRate(rate, flakyCommits, ranCommits)),
   );
   return match?.[1] ?? "";
+}
+
+/** The report for the one ranked issue with PRs 1 to `count` of acme/app. */
+function withPrs(count: number) {
+  const prs = Array.from({ length: count }, (_, i) => ({ repo: "acme/app", number: i + 1 }));
+  return { ...withRate(0.5, 1, 2), ranked: [{ ...ranked, prs }] };
+}
+
+/** The text of every PR link in the page. */
+function prLinks(html: string): string[] {
+  return [...html.matchAll(/<a href="https:\/\/github\.com\/[^"]*\/pull\/\d+">([^<]*)<\/a>/g)].map(
+    (match) => match[1] ?? "",
+  );
+}
+
+/** The lines the card's excerpt box shows for this log and failure. */
+function shownLines(log: string, latestFailure: RankedIssue["latestFailure"]): string[] {
+  const excerpt: JobExcerpt = {
+    repo: "acme/app",
+    jobId: 10,
+    url: URL,
+    status: "kept",
+    excerpt: log,
+  };
+  const html = reportHtml({
+    ranked: [{ ...ranked, latestFailure }],
+    excerpts: new Map([[URL, excerpt]]),
+    repos: ["acme/app"],
+    coverage: [],
+    now: "2026-12-01T00:00:00.000Z",
+  });
+  const match = /<pre>([\s\S]*?)<\/pre>/.exec(html);
+  return (match?.[1] ?? "").split("\n");
 }

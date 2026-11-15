@@ -96,4 +96,4 @@ export {
   type IssueSummary,
 } from "./issues.ts";
 
-export { rankIssues, type RankedIssue, type RankInput } from "./catalogue-rank.ts";
+export { latestFailureOf, rankIssues, type RankedIssue, type RankInput } from "./catalogue-rank.ts";

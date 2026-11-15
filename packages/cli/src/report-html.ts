@@ -22,6 +22,20 @@ export interface ReportInput {
 /** The lines of an excerpt a card shows; the rest is in the job's log on GitHub. */
 const EXCERPT_LINES = 40;
 
+/** The lines shown above the failing line, so the box opens on a little of what led to it. */
+const LINES_ABOVE = 5;
+
+/**
+ * How many phone-width rows (`ROW_CHARS` characters each, about a 390px screen) the lines above the failing
+ * line may take. The box's visible height is about 19 rows; long lines above the failing line wrap, and
+ * without this cap five of them can push it out of the box.
+ */
+const ABOVE_ROWS = 12;
+const ROW_CHARS = 36;
+
+/** The PR links a card lists before it says how many more there are. */
+const MAX_PRS = 5;
+
 const ESCAPES: Readonly<Record<string, string>> = {
   "&": "&amp;",
   "<": "&lt;",
@@ -49,23 +63,63 @@ function rateText(issue: RankedIssue): string {
   return `${percent}% ${count}`;
 }
 
+/** The first `MAX_PRS` PR links in the order `prs` has, then how many more there are. */
 function prsHtml(issue: RankedIssue): string {
   if (issue.prs.length === 0) return "none";
-  return issue.prs
+  const links = issue.prs
+    .slice(0, MAX_PRS)
     .map((pr) => {
       const href = escapeHtml(`https://github.com/${pr.repo}/pull/${pr.number}`);
       return `<a href="${href}">${escapeHtml(`${pr.repo} #${pr.number}`)}</a>`;
     })
     .join(", ");
+  const more = issue.prs.length - MAX_PRS;
+  return more > 0 ? `${links} and ${more} more` : links;
 }
 
-/** The card's excerpt: the first lines of the latest failed job's log, or a note when it is gone. */
+/**
+ * The 0-indexed line the excerpt opens on: the first holding the failure's title, else the first holding
+ * its error line; -1 when neither is found.
+ */
+function anchorOf(lines: readonly string[], failure: RankedIssue["latestFailure"]): number {
+  if (failure === null) return -1;
+  const { title, errorLine } = failure;
+  if (title !== null && title !== "") {
+    const at = lines.findIndex((line) => line.includes(title));
+    if (at !== -1) return at;
+  }
+  if (errorLine === "") return -1;
+  return lines.findIndex((line) => line.includes(errorLine));
+}
+
+/**
+ * The excerpt lines a card shows: `EXCERPT_LINES` starting `LINES_ABOVE` above the failing line, moved up
+ * so the box is full when that line is near the end, but with no more lines above it than fit in
+ * `ABOVE_ROWS` phone rows. With no failing line found, the last lines, where a job's error is.
+ */
+function excerptWindow(excerpt: string, failure: RankedIssue["latestFailure"]): string[] {
+  const lines = excerpt.split("\n");
+  const anchor = anchorOf(lines, failure);
+  const last = Math.max(0, lines.length - EXCERPT_LINES);
+  if (anchor === -1) return lines.slice(last);
+  let start = anchor;
+  let rows = 0;
+  const wanted = Math.min(Math.max(0, anchor - LINES_ABOVE), last);
+  while (start > wanted) {
+    rows += Math.max(1, Math.ceil((lines[start - 1] ?? "").length / ROW_CHARS));
+    if (rows > ABOVE_ROWS) break;
+    start -= 1;
+  }
+  return lines.slice(start, start + EXCERPT_LINES);
+}
+
+/** The card's excerpt: the latest failed job's log around the issue's failure, or a note when it is gone. */
 function excerptHtml(issue: RankedIssue, excerpts: ReadonlyMap<string, JobExcerpt>): string {
   const row = issue.latestUrl === null ? undefined : excerpts.get(issue.latestUrl);
   if (row === undefined || row.status !== "kept" || row.excerpt === null) {
     return `<p class="gone">log expired</p>`;
   }
-  const lines = row.excerpt.split("\n").slice(0, EXCERPT_LINES).join("\n");
+  const lines = excerptWindow(row.excerpt, issue.latestFailure).join("\n");
   return `<pre>${escapeHtml(lines)}</pre>`;
 }
 

@@ -27,6 +27,11 @@ export interface RankedIssue {
   suspect: boolean;
   /** The page of the issue's latest failed job in the window (by startedAt): where its excerpt comes from. */
   latestUrl: string | null;
+  /**
+   * The issue's failure on the `latestUrl` job (the lowest signature when that job holds several): what the
+   * report anchors its excerpt on. Null when `latestUrl` is null.
+   */
+  latestFailure: { title: string | null; errorLine: string } | null;
 }
 
 export interface RankInput {
@@ -108,10 +113,10 @@ function indexFailures(
   input: RankInput,
   startMs: number,
   nowMs: number,
-): { counted: Map<string, JobRecord[]>; allUrls: Map<string, Set<string>> } {
+): { counted: Map<string, Counted[]>; allUrls: Map<string, Set<string>> } {
   const recordByUrl = new Map(input.records.map((record) => [record.url, record]));
   const issueIds = new Set(input.issues.map((issue) => issue.id));
-  const counted = new Map<string, JobRecord[]>();
+  const counted = new Map<string, Counted[]>();
   const allUrls = new Map<string, Set<string>>();
   for (const failure of input.failures) {
     if (!issueIds.has(failure.issueId)) continue;
@@ -119,9 +124,30 @@ function indexFailures(
     const record = recordByUrl.get(failure.url);
     if (record === undefined || outcomeOf(record) !== "failed") continue;
     if (!inWindow(record, startMs, nowMs)) continue;
-    counted.set(failure.issueId, [...(counted.get(failure.issueId) ?? []), record]);
+    counted.set(failure.issueId, [...(counted.get(failure.issueId) ?? []), { record, failure }]);
   }
   return { counted, allUrls };
+}
+
+/** A failure that counts, beside its job's record. */
+interface Counted {
+  record: JobRecord;
+  failure: Failure;
+}
+
+/**
+ * The issue's failure on the job at `url` with the lowest signature, as the report anchors on it; null when
+ * there is no such job. `failures` are the issue's own.
+ */
+export function latestFailureOf(
+  failures: readonly Failure[],
+  url: string | null,
+): RankedIssue["latestFailure"] {
+  if (url === null) return null;
+  const first = failures
+    .filter((failure) => failure.url === url)
+    .toSorted((a, b) => compareText(a.signature, b.signature))[0];
+  return first === undefined ? null : { title: first.title, errorLine: first.errorLine };
 }
 
 /** The commits that ran any of the jobs, each commit once. */
@@ -168,12 +194,13 @@ function latestOf(jobs: JobRecord[]): JobRecord | undefined {
 /** One issue's ranked entry. `counted` is non-empty, so the issue has at least one commit. */
 function rankOne(
   issue: Issue,
-  counted: JobRecord[],
+  counted: Counted[],
   allUrls: Set<string>,
   ctx: Context,
 ): RankedIssue {
   // One job can hold several failures of the issue: each job counts once, by its page.
-  const jobs = [...new Map(counted.map((record) => [record.url, record])).values()];
+  const jobs = [...new Map(counted.map(({ record }) => [record.url, record])).values()];
+  const latestUrl = latestOf(jobs)?.url ?? null;
   const ranCommits = ranOf(jobs, ctx.ran);
   const flakyCommits = flakyOf(jobs, ranCommits, ctx.flakes);
   return {
@@ -186,7 +213,11 @@ function rankOne(
     flakyCommits: flakyCommits.size,
     ranCommits: ranCommits.size,
     suspect: [...allUrls].some((url) => ctx.suspectUrls.has(url)),
-    latestUrl: latestOf(jobs)?.url ?? null,
+    latestUrl,
+    latestFailure: latestFailureOf(
+      counted.map(({ failure }) => failure),
+      latestUrl,
+    ),
   };
 }
 
@@ -204,9 +235,9 @@ export function rankIssues(input: RankInput): RankedIssue[] {
   };
   const ranked: RankedIssue[] = [];
   for (const issue of input.issues) {
-    const jobs = counted.get(issue.id);
-    if (jobs === undefined || issue.status === "dismissed") continue;
-    ranked.push(rankOne(issue, jobs, allUrls.get(issue.id) ?? new Set(), ctx));
+    const failures = counted.get(issue.id);
+    if (failures === undefined || issue.status === "dismissed") continue;
+    ranked.push(rankOne(issue, failures, allUrls.get(issue.id) ?? new Set(), ctx));
   }
   return ranked.toSorted(compareRanked).map((entry, index) => ({ ...entry, rank: index + 1 }));
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   findJobFlakes,
+  latestFailureOf,
   rankIssues,
   type Failure,
   type Issue,
@@ -185,6 +186,36 @@ describe("rankIssues", () => {
       rate: 1,
       suspect: true,
       latestUrl: flaky.records[0]?.url,
+    });
+  });
+
+  describe("latestFailure", () => {
+    it("is the issue's failure on the latest job, the lowest signature when that job holds several", () => {
+      const early = job({ jobId: 1, url: "https://github.com/acme/app/actions/runs/1/job/1" });
+      const late = job({
+        jobId: 2,
+        url: "https://github.com/acme/app/actions/runs/2/job/2",
+        commit: "def456",
+        startedAt: "2026-11-25T10:00:00Z",
+        completedAt: "2026-11-25T10:05:00Z",
+      });
+      const onEarly = { ...failureOf(early, "it"), title: "early test", signature: "a" };
+      const lateB = {
+        ...failureOf(late, "it"),
+        title: "late b",
+        errorLine: "b failed",
+        signature: "b",
+      };
+      const lateC = { ...failureOf(late, "it"), title: "late c", signature: "c" };
+      const [entry] = rank([early, late], [lateC, onEarly, lateB], [issue("it")]);
+
+      expect(entry?.latestUrl).toBe(late.url);
+      expect(entry?.latestFailure).toEqual({ title: "late b", errorLine: "b failed" });
+    });
+
+    it("is null when there is no latest job", () => {
+      const record = job();
+      expect(latestFailureOf([failureOf(record, "it")], null)).toBeNull();
     });
   });
 });
