@@ -23,6 +23,9 @@ function latch() {
 }
 const MINUTE = 60 * 1000;
 
+/** A wait that takes no time, so a refused refresh polls through its bound at once. */
+const NO_WAIT = async (): Promise<void> => undefined;
+
 async function withSession(accessMs: number, refreshMs?: number) {
   const db = testDb();
   const store = { db, tokenKey: TEST_TOKEN_KEY };
@@ -30,7 +33,45 @@ async function withSession(accessMs: number, refreshMs?: number) {
   const issued = tokens(NOW, accessMs);
   if (refreshMs !== undefined) issued.refreshExpiresAt = new Date(NOW.getTime() + refreshMs);
   const cookie = await createSession(store, 7, issued, NOW);
-  return { db, store, cookie, deps: { ...store, config: () => config, now: NOW } };
+  return { db, store, cookie, deps: { ...store, config: () => config, now: NOW, wait: NO_WAIT } };
+}
+
+/**
+ * Two requests race to refresh: the winner's grant is held until the loser's `waitsBeforeWin`th
+ * wait, which lets it through and returns only once the winner has saved its tokens. The loser's
+ * refusal answers at once. Waits take no real time.
+ */
+async function race(waitsBeforeWin: number) {
+  const { deps, cookie } = await withSession(4 * MINUTE);
+  const winnerAsked = latch();
+  const winnerMayAnswer = latch();
+  let grants = 0;
+  stubGithub({
+    "POST /login/oauth/access_token": async () => {
+      grants += 1;
+      if (grants === 2) return { body: { error: "bad_refresh_token" } };
+      winnerAsked.open();
+      await winnerMayAnswer.done;
+      return grant("ghu_first", "ghr_first");
+    },
+  });
+  const winner = loadViewer(deps, cookie);
+  await winnerAsked.done;
+  const waits: number[] = [];
+  const loser = loadViewer(
+    {
+      ...deps,
+      wait: async (ms) => {
+        waits.push(ms);
+        if (waits.length === waitsBeforeWin) {
+          winnerMayAnswer.open();
+          await winner;
+        }
+      },
+    },
+    cookie,
+  );
+  return { winner: await winner, loser: await loser, waits };
 }
 
 describe("signing in is required", () => {
@@ -82,12 +123,17 @@ describe("the access token", () => {
     expect(await unseal(TEST_TOKEN_KEY, row?.refreshToken ?? "")).toBe("ghr_new");
   });
 
-  test("a failed refresh ends the session", async () => {
+  test("a refused refresh that no other request answers ends the session after 3 seconds", async () => {
     const { deps, cookie, store } = await withSession(4 * MINUTE);
     stubGithub({
       "POST /login/oauth/access_token": () => ({ body: { error: "bad_refresh_token" } }),
     });
-    expect(await loadViewer(deps, cookie)).toBeNull();
+    const waits: number[] = [];
+    const wait = async (ms: number): Promise<void> => {
+      waits.push(ms);
+    };
+    expect(await loadViewer({ ...deps, wait }, cookie)).toBeNull();
+    expect(waits).toEqual(Array.from({ length: 60 }, () => 50));
     expect(await sessionUser(store, cookie, NOW)).toBeNull();
   });
 
@@ -107,36 +153,37 @@ describe("the access token", () => {
   });
 
   test("a refresh refused before the winner has written back still waits for its tokens", async () => {
-    const { deps, cookie } = await withSession(4 * MINUTE);
-    const refused = latch();
-    let grants = 0;
-    stubGithub({
-      "POST /login/oauth/access_token": async () => {
-        grants += 1;
-        if (grants === 2) {
-          // The loser's refusal arrives first; the winner's grant lands just after.
-          setTimeout(refused.open, 50);
-          return { body: { error: "bad_refresh_token" } };
-        }
-        await refused.done;
-        return grant("ghu_first", "ghr_first");
-      },
-    });
-    const [winner, loser] = await Promise.all([loadViewer(deps, cookie), loadViewer(deps, cookie)]);
+    const { winner, loser, waits } = await race(1);
     expect(winner?.accessToken).toBe("ghu_first");
     expect(loser?.accessToken).toBe("ghu_first");
+    expect(waits).toEqual([50]);
+  });
+
+  test("a winner slow to write back still hands the loser its tokens", async () => {
+    const { winner, loser, waits } = await race(5);
+    expect(winner?.accessToken).toBe("ghu_first");
+    expect(loser?.accessToken).toBe("ghu_first");
+    expect(waits).toEqual([50, 50, 50, 50, 50]);
   });
 
   test("a refresh that lost a race to another request uses that request's tokens", async () => {
     const { deps, cookie } = await withSession(4 * MINUTE);
     const first = latch();
+    const firstAsked = latch();
+    const secondAsked = latch();
     let grants = 0;
     stubGithub({
       "POST /login/oauth/access_token": async () => {
         grants += 1;
-        if (grants === 1) return grant("ghu_first", "ghr_first");
+        if (grants === 1) {
+          // Both requests read the old tokens before either has a grant.
+          firstAsked.open();
+          await secondAsked.done;
+          return grant("ghu_first", "ghr_first");
+        }
         // GitHub rotated the refresh token on the first grant, so the second is refused; it
         // answers once the first request has written its tokens back.
+        secondAsked.open();
         await first.done;
         return { body: { error: "bad_refresh_token" } };
       },
@@ -145,6 +192,8 @@ describe("the access token", () => {
       first.open();
       return v;
     });
+    // The second request starts once the first has asked GitHub, so the first holds the grant.
+    await firstAsked.done;
     const b = loadViewer(deps, cookie);
     const [winner, loser] = await Promise.all([a, b]);
     expect(grants).toBe(2);
