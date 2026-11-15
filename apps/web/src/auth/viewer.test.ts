@@ -123,12 +123,17 @@ describe("the access token", () => {
     expect(await unseal(TEST_TOKEN_KEY, row?.refreshToken ?? "")).toBe("ghr_new");
   });
 
-  test("a failed refresh ends the session", async () => {
+  test("a refused refresh that no other request answers ends the session after 3 seconds", async () => {
     const { deps, cookie, store } = await withSession(4 * MINUTE);
     stubGithub({
       "POST /login/oauth/access_token": () => ({ body: { error: "bad_refresh_token" } }),
     });
-    expect(await loadViewer(deps, cookie)).toBeNull();
+    const waits: number[] = [];
+    const wait = async (ms: number): Promise<void> => {
+      waits.push(ms);
+    };
+    expect(await loadViewer({ ...deps, wait }, cookie)).toBeNull();
+    expect(waits).toEqual(Array.from({ length: 60 }, () => 50));
     expect(await sessionUser(store, cookie, NOW)).toBeNull();
   });
 
@@ -159,21 +164,6 @@ describe("the access token", () => {
     expect(winner?.accessToken).toBe("ghu_first");
     expect(loser?.accessToken).toBe("ghu_first");
     expect(waits).toEqual([50, 50, 50, 50, 50]);
-  });
-
-  test("a refused refresh whose winner never writes back ends the session after 3 seconds", async () => {
-    const { deps, cookie, store } = await withSession(4 * MINUTE);
-    stubGithub({
-      "POST /login/oauth/access_token": () => ({ body: { error: "bad_refresh_token" } }),
-    });
-    const waits: number[] = [];
-    const wait = async (ms: number): Promise<void> => {
-      waits.push(ms);
-    };
-    expect(await loadViewer({ ...deps, wait }, cookie)).toBeNull();
-    expect(waits).toHaveLength(60);
-    expect(waits.reduce((sum, ms) => sum + ms, 0)).toBe(3000);
-    expect(await sessionUser(store, cookie, NOW)).toBeNull();
   });
 
   test("a refresh that lost a race to another request uses that request's tokens", async () => {
