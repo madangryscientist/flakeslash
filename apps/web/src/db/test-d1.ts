@@ -13,7 +13,12 @@ const CONFIG = fileURLToPath(new URL("../../wrangler.jsonc", import.meta.url));
  * `testDb()`, and only for what in-memory SQLite does not enforce: D1's limits, such as its 100
  * bound parameters per statement. Nothing is persisted; call `dispose` when done.
  */
-export async function d1Db(): Promise<{ db: BatchDb; dispose: () => Promise<void> }> {
+export async function d1Db(): Promise<{
+  db: BatchDb;
+  /** The binding itself, as a Worker's `env.DB`. */
+  d1: D1Database;
+  dispose: () => Promise<void>;
+}> {
   const proxy = await getPlatformProxy<{ DB: D1Database }>({ configPath: CONFIG, persist: false });
   for (const file of readdirSync(MIGRATIONS)
     .filter((f) => f.endsWith(".sql"))
@@ -24,5 +29,9 @@ export async function d1Db(): Promise<{ db: BatchDb; dispose: () => Promise<void
       if (stmt.trim()) await proxy.env.DB.prepare(stmt).run();
     }
   }
-  return { db: drizzle(proxy.env.DB, { schema }), dispose: () => proxy.dispose() };
+  return {
+    db: drizzle(proxy.env.DB, { schema }),
+    d1: proxy.env.DB,
+    dispose: () => proxy.dispose(),
+  };
 }

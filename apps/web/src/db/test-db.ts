@@ -13,6 +13,8 @@ export interface TestDbOptions {
    * before it. The batch's transaction then rolls back, so a test can see that a batch is all or nothing.
    */
   failBatchAt?: number;
+  /** Called once for each statement run, in a batch or on its own, so a test can count them. */
+  onStatement?: (sql: string) => void;
 }
 
 /**
@@ -20,7 +22,7 @@ export interface TestDbOptions {
  * D1 gives in production, `db.batch` included: a batch runs in one transaction, all or nothing as on D1.
  * Tests only: no network, no Cloudflare account. Runs under Bun (`bun --bun vitest`).
  */
-export function testDb({ failBatchAt }: TestDbOptions = {}) {
+export function testDb({ failBatchAt, onStatement }: TestDbOptions = {}) {
   const sqlite = new DatabaseSync(":memory:");
   sqlite.exec("PRAGMA foreign_keys = ON");
   for (const file of readdirSync(MIGRATIONS)
@@ -33,6 +35,7 @@ export function testDb({ failBatchAt }: TestDbOptions = {}) {
     }
   }
   const exec = (query: string, params: SQLInputValue[], method: Method) => {
+    onStatement?.(query);
     const stmt = sqlite.prepare(query);
     // Arrays, not objects: a join selecting two `id` columns must keep both.
     stmt.setReturnArrays(true);

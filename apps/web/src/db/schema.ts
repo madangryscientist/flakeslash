@@ -37,6 +37,11 @@ export const repos = sqliteTable(
     name: text("name").notNull(),
     /** ISO 8601. */
     addedAt: text("added_at").notNull(),
+    /**
+     * ISO 8601: when the hourly scan last finished a turn on this repo (returned, cut short or threw).
+     * Null until the first one. The scan takes repos oldest first, never-scanned first of all.
+     */
+    scannedAt: text("scanned_at"),
     isSmoke: isSmoke(),
   },
   (t) => [primaryKey({ columns: [t.orgId, t.name] })],
