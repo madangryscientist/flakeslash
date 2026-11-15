@@ -12,6 +12,8 @@ Source-available flaky-test detection you can run yourself, under the Elastic Li
 | `packages/cli` | the `flakeslash` command |
 | `apps/web` | the dashboard: TanStack Start on Cloudflare Workers, D1 via Drizzle |
 
+The made-up personas that judge the dashboard, the report and the CLI live in [`docs/personas/`](docs/personas).
+
 ## Develop
 
 ```bash
