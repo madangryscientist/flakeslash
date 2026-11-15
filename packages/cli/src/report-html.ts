@@ -42,8 +42,11 @@ export function minutesOf(seconds: number): number {
 
 function rateText(issue: RankedIssue): string {
   if (issue.rate === null) return "no rate";
+  const count = `(${issue.flakyCommits} of ${issue.ranCommits} commits)`;
+  // A rate above 0 and under 1% would round to 0%, which reads as a clean test.
+  if (issue.rate > 0 && issue.rate < 0.01) return `<1% ${count}`;
   const percent = Math.round(issue.rate * 100);
-  return `${percent}% (${issue.flakyCommits} of ${issue.ranCommits} commits)`;
+  return `${percent}% ${count}`;
 }
 
 function prsHtml(issue: RankedIssue): string {
