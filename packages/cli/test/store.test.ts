@@ -2,13 +2,7 @@ import { Database } from "bun:sqlite";
 import { copyFileSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type {
-  Failure,
-  Issue,
-  JobExcerpt,
-  JobRecord,
-  ReadAttempt,
-} from "@hackcove/flakeslash-engine";
+import type { Failure, Issue, JobExcerpt, JobRecord } from "@hackcove/flakeslash-engine";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openSqliteStore, type SqliteStore } from "../src/store.ts";
 
@@ -38,6 +32,17 @@ function job(overrides: Partial<JobRecord> = {}): JobRecord {
     ...overrides,
   };
 }
+
+/** The attempts row a scan writes beside an attempt's jobs: an attempt is held only with it. */
+const attempt = (runId: number, jobCount: number) => ({
+  repo: REPO,
+  runId,
+  runAttempt: 1,
+  conclusion: "success",
+  createdAt: "2026-11-05T10:00:00Z",
+  latestAttempt: 1,
+  jobCount,
+});
 
 const issue = (id: string): Issue => ({
   id,
@@ -72,26 +77,6 @@ describe("the SQLite store", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  /** Writes the jobs and then each attempt's row, as a scan does: an attempt is held only with its row. */
-  async function writeRun(records: JobRecord[]): Promise<void> {
-    await store.writeJobs(records);
-    const read = new Map<string, ReadAttempt>();
-    for (const r of records) {
-      const key = `${r.repo} ${r.runId} ${r.runAttempt}`;
-      const jobCount = (read.get(key)?.jobCount ?? 0) + 1;
-      read.set(key, {
-        repo: r.repo,
-        runId: r.runId,
-        runAttempt: r.runAttempt,
-        conclusion: "success",
-        createdAt: "2026-11-05T10:00:00Z",
-        latestAttempt: r.runAttempt,
-        jobCount,
-      });
-    }
-    await store.writeAttempts([...read.values()]);
-  }
-
   it("keeps one row when the same job is written twice", async () => {
     await store.writeJobs([job(), job({ jobId: 2 })]);
     await store.writeJobs([job(), job({ jobId: 2 })]);
@@ -100,31 +85,35 @@ describe("the SQLite store", () => {
   });
 
   it("holds an attempt written with its jobs finished", async () => {
-    await writeRun([job({ runId: 10, runAttempt: 1 })]);
+    await store.writeJobs([job({ runId: 10, runAttempt: 1 })]);
+    await store.writeAttempts([attempt(10, 1)]);
 
     expect(await store.heldAttempts(REPO)).toEqual([{ runId: 10, runAttempt: 1 }]);
   });
 
   it("holds attempt 1 of a run and not attempt 2 while attempt 2 is unfinished", async () => {
-    await writeRun([
+    await store.writeJobs([
       job({ runId: 10, runAttempt: 1 }),
       job({ runId: 10, runAttempt: 2, conclusion: null, completedAt: null }),
     ]);
+    await store.writeAttempts([attempt(10, 1), { ...attempt(10, 1), runAttempt: 2 }]);
 
     expect(await store.heldAttempts(REPO)).toEqual([{ runId: 10, runAttempt: 1 }]);
   });
 
   it("does not hold an attempt with a job whose conclusion is null, and holds it once written finished", async () => {
-    await writeRun([job({ conclusion: null, completedAt: null })]);
+    await store.writeJobs([job({ conclusion: null, completedAt: null })]);
+    await store.writeAttempts([attempt(10, 1)]);
     expect(await store.heldAttempts(REPO)).toEqual([]);
 
-    await writeRun([job({ conclusion: "success" })]);
+    await store.writeJobs([job({ conclusion: "success" })]);
     expect(await store.heldAttempts(REPO)).toEqual([{ runId: 10, runAttempt: 1 }]);
     expect(await store.readJobs(REPO)).toHaveLength(1);
   });
 
   it("does not return another repo's rows", async () => {
-    await writeRun([job({ runId: 10 }), job({ repo: OTHER, runId: 20 })]);
+    await store.writeJobs([job({ runId: 10 }), job({ repo: OTHER, runId: 20 })]);
+    await store.writeAttempts([attempt(10, 1), { ...attempt(20, 1), repo: OTHER }]);
 
     expect(await store.heldAttempts(REPO)).toEqual([{ runId: 10, runAttempt: 1 }]);
     expect(await store.readJobs(REPO)).toEqual([job({ runId: 10 })]);
