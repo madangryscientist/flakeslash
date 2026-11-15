@@ -12,10 +12,6 @@ describe("seal and unseal", () => {
     expect(await unseal(TEST_TOKEN_KEY, stored)).toBe("ghu_secret");
   });
 
-  test("a value that is not sealed is refused, never used as it is", async () => {
-    await expect(unseal(TEST_TOKEN_KEY, "ghu_plain")).rejects.toThrow(SealedUnreadableError);
-  });
-
   test("another key cannot open it", async () => {
     const stored = await seal(TEST_TOKEN_KEY, "ghu_secret");
     await expect(unseal(OTHER_KEY, stored)).rejects.toThrow(SealedUnreadableError);

@@ -99,6 +99,27 @@ describe("the access token", () => {
     expect(await sessionUser(store, cookie, NOW)).toBeNull();
   });
 
+  test("a refresh refused before the winner has written back still waits for its tokens", async () => {
+    const { deps, cookie } = await withSession(4 * MINUTE);
+    const refused = latch();
+    let grants = 0;
+    stubGithub({
+      "POST /login/oauth/access_token": async () => {
+        grants += 1;
+        if (grants === 2) {
+          // The loser's refusal arrives first; the winner's grant lands just after.
+          setTimeout(refused.open, 50);
+          return { body: { error: "bad_refresh_token" } };
+        }
+        await refused.done;
+        return grant("ghu_first", "ghr_first");
+      },
+    });
+    const [winner, loser] = await Promise.all([loadViewer(deps, cookie), loadViewer(deps, cookie)]);
+    expect(winner?.accessToken).toBe("ghu_first");
+    expect(loser?.accessToken).toBe("ghu_first");
+  });
+
   test("a refresh that lost a race to another request uses that request's tokens", async () => {
     const { deps, cookie } = await withSession(4 * MINUTE);
     const first = latch();

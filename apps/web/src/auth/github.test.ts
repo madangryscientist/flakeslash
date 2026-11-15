@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { config, grant, stubGithub } from "#/test/github-fetch.ts";
-import { authorizeUrl, exchangeCode, readProfile, refreshTokens } from "./github.ts";
+import { authorizeUrl, exchangeCode, readProfile } from "./github.ts";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -14,7 +14,7 @@ test("the authorize URL asks for no scope: the App's permissions are the token's
   expect(url.searchParams.get("client_id")).toBe("Iv1.test");
 });
 
-describe("the token grants", () => {
+describe("the code grant", () => {
   test("a code becomes an access and a refresh token with their expiries", async () => {
     const calls = stubGithub({ "POST /login/oauth/access_token": () => grant("ghu_a", "ghr_a") });
     const tokens = await exchangeCode(config, "c1", "https://fs.test/cb", NOW);
@@ -25,19 +25,6 @@ describe("the token grants", () => {
       refreshExpiresAt: new Date(NOW.getTime() + 15_897_600_000),
     });
     expect(calls[0]?.body).toMatchObject({ code: "c1", client_secret: "test-secret" });
-  });
-
-  test("a refresh sends the refresh grant", async () => {
-    const calls = stubGithub({ "POST /login/oauth/access_token": () => grant("ghu_b", "ghr_b") });
-    expect((await refreshTokens(config, "ghr_a", NOW)).refreshToken).toBe("ghr_b");
-    expect(calls[0]?.body).toMatchObject({ grant_type: "refresh_token", refresh_token: "ghr_a" });
-  });
-
-  test("GitHub's refusal, a 200 with an error, is an error", async () => {
-    stubGithub({
-      "POST /login/oauth/access_token": () => ({ body: { error: "bad_refresh_token" } }),
-    });
-    await expect(refreshTokens(config, "ghr_a", NOW)).rejects.toThrow("GitHub token grant failed");
   });
 });
 

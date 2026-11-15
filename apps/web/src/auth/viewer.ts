@@ -15,7 +15,13 @@ import { type GithubConfig, type GithubTokens, refreshTokens } from "./github.ts
  * The signed-in person for one request. It holds their GitHub access token, so it stays on the
  * server: a route returns what a page shows (the login), never this.
  */
-export type Viewer = { user: User; db: Db; apiBase: string; accessToken: string };
+export type Viewer = {
+  user: User;
+  db: Db;
+  sessionId: string;
+  apiBase: string;
+  accessToken: string;
+};
 
 export type ViewerDeps = SessionStore & { config: () => GithubConfig; now?: Date };
 
@@ -40,36 +46,54 @@ export async function loadViewer(
   return {
     user: session.user,
     db: deps.db,
+    sessionId: session.id,
     apiBase: config.apiBase,
     accessToken: tokens.accessToken,
   };
 }
 
-/** The session's refreshed tokens, written back; a failed refresh ends the session (null). */
+/** How long a refused refresh waits for a racing request to write its tokens back. */
+const RACE_WAIT_MS = 500;
+
+/** The session's refreshed tokens, written back; a refused refresh ends the session (null). */
 async function refreshed(
   deps: ViewerDeps,
   session: Session,
   now: Date,
 ): Promise<GithubTokens | null> {
   if (session.tokens.refreshExpiresAt > now) {
-    try {
-      const tokens = await refreshTokens(deps.config(), session.tokens.refreshToken, now);
+    const tokens = await refreshTokens(deps.config(), session.tokens.refreshToken, now).catch(
+      () => null,
+    );
+    if (tokens) {
       await saveTokens(deps, session.id, tokens);
       return tokens;
-    } catch {
-      // GitHub rotates the refresh token, so a request that raced this one and refreshed first
-      // has spent ours. Its tokens are in the row now: use them rather than sign the person out.
-      const again = await sessionById(deps, session.id, now);
-      if (
-        again &&
-        again.tokens.refreshToken !== session.tokens.refreshToken &&
-        fresh(again.tokens, now)
-      )
-        return again.tokens;
     }
+    // GitHub rotates the refresh token, so a request that raced this one and refreshed first has
+    // spent ours. Its tokens are in the row, or about to be: use them rather than sign out.
+    const winner =
+      (await rotated(deps, session, now)) ??
+      (await new Promise((resolve) => setTimeout(resolve, RACE_WAIT_MS)).then(() =>
+        rotated(deps, session, now),
+      ));
+    if (winner) return winner;
   }
   await endSessionById(deps.db, session.id);
   return null;
+}
+
+/** The row's tokens, when another request has refreshed them since `session` was read. */
+async function rotated(
+  deps: ViewerDeps,
+  session: Session,
+  now: Date,
+): Promise<GithubTokens | null> {
+  const again = await sessionById(deps, session.id, now);
+  return again &&
+    again.tokens.refreshToken !== session.tokens.refreshToken &&
+    fresh(again.tokens, now)
+    ? again.tokens
+    : null;
 }
 
 /** For a signed-in page or action: no viewer sends the browser to sign in. */

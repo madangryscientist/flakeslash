@@ -1,8 +1,9 @@
 import { eq } from "drizzle-orm";
 import { githubHeaders, isRecord } from "#/auth/github.ts";
-import type { Viewer } from "#/auth/viewer.ts";
+import { type Viewer, signedIn } from "#/auth/viewer.ts";
 import { readFailures, readIssues } from "#/db/catalogue.ts";
 import { organisations } from "#/db/schema.ts";
+import { endSessionById } from "#/db/users.ts";
 
 /**
  * The one gate every data query a person reads goes through. Routes import from here, never from
@@ -19,7 +20,13 @@ export type Level = "view" | "write" | "admin";
 
 type Permissions = { pull: boolean; push: boolean };
 
-type Memo = { repos: Map<string, Promise<Permissions>>; admin: Map<number, Promise<boolean>> };
+type Org = { id: number; login: string; type: "User" | "Organization" };
+
+type Memo = {
+  orgs: Map<number, Promise<Org | null>>;
+  repos: Map<string, Promise<Permissions>>;
+  admin: Map<number, Promise<boolean>>;
+};
 
 /** One memo per viewer, and a viewer is built per request. */
 const memos = new WeakMap<Viewer, Memo>();
@@ -27,7 +34,7 @@ const memos = new WeakMap<Viewer, Memo>();
 function memoOf(viewer: Viewer): Memo {
   let memo = memos.get(viewer);
   if (!memo) {
-    memo = { repos: new Map(), admin: new Map() };
+    memo = { orgs: new Map(), repos: new Map(), admin: new Map() };
     memos.set(viewer, memo);
   }
   return memo;
@@ -42,11 +49,18 @@ function once<K, V>(map: Map<K, Promise<V>>, key: K, load: () => Promise<V>): Pr
   return value;
 }
 
-/** GET as the person; null when GitHub says they cannot see it (404, or 403 for the App). */
+/**
+ * GET as the person; null when GitHub says they cannot see it (404, or 403 for the App). A 401 is
+ * a token GitHub no longer takes (the person revoked the App): the session ends and they sign in.
+ */
 async function githubGet(viewer: Viewer, path: string): Promise<unknown> {
   const res = await fetch(new URL(path, viewer.apiBase), {
     headers: githubHeaders(viewer.accessToken),
   });
+  if (res.status === 401) {
+    await endSessionById(viewer.db, viewer.sessionId);
+    signedIn(null);
+  }
   if (res.status === 404 || res.status === 403) return null;
   if (!res.ok) throw new Error(`GitHub ${path} answered ${res.status}`);
   return res.json();
@@ -67,18 +81,25 @@ async function repoPermissions(viewer: Viewer, repo: string): Promise<Permission
   return { pull: permissions["pull"] === true, push: permissions["push"] === true };
 }
 
-async function isAdmin(viewer: Viewer, orgId: number): Promise<boolean> {
+async function orgRow(viewer: Viewer, orgId: number): Promise<Org | null> {
   const [org] = await viewer.db
     .select({ id: organisations.id, login: organisations.login, type: organisations.type })
     .from(organisations)
     .where(eq(organisations.id, orgId));
-  if (!org) return false;
+  return org ?? null;
+}
+
+async function isAdmin(viewer: Viewer, org: Org): Promise<boolean> {
   if (org.type === "User") return org.id === viewer.user.id;
   const body = await githubGet(viewer, `/user/memberships/orgs/${encodeURIComponent(org.login)}`);
   return isRecord(body) && body["role"] === "admin" && body["state"] === "active";
 }
 
-/** The repos of `repos` the person holds at `level` in the organisation. */
+/**
+ * The repos of `repos` the person holds at `level` in the organisation. A repo another owner
+ * holds is never the organisation's, so it is refused at every level; so is everything when the
+ * organisation has no row.
+ */
 export async function access(
   viewer: Viewer,
   orgId: number,
@@ -86,15 +107,18 @@ export async function access(
   level: Level,
 ): Promise<string[]> {
   const memo = memoOf(viewer);
+  const org = await once(memo.orgs, orgId, () => orgRow(viewer, orgId));
+  if (!org) return [];
+  const own = repos.filter((repo) => repo.startsWith(`${org.login}/`));
   if (level === "admin")
-    return (await once(memo.admin, orgId, () => isAdmin(viewer, orgId))) ? [...repos] : [];
+    return (await once(memo.admin, orgId, () => isAdmin(viewer, org))) ? own : [];
   const held = await Promise.all(
-    repos.map(async (repo) => {
+    own.map(async (repo) => {
       const p = await once(memo.repos, repo, () => repoPermissions(viewer, repo));
       return level === "view" ? p.pull : p.push;
     }),
   );
-  return repos.filter((_, i) => held[i]);
+  return own.filter((_, i) => held[i]);
 }
 
 type Issue = Awaited<ReturnType<typeof readIssues>>[number];
@@ -116,9 +140,12 @@ export async function issuesFor(
     await access(viewer, orgId, [...new Set(failures.map((f) => f.repo))], "view"),
   );
   const byIssue = new Map<string, Failure[]>();
-  for (const failure of failures)
-    if (viewable.has(failure.repo))
-      byIssue.set(failure.issueId, [...(byIssue.get(failure.issueId) ?? []), failure]);
+  for (const failure of failures) {
+    if (!viewable.has(failure.repo)) continue;
+    const list = byIssue.get(failure.issueId);
+    if (list) list.push(failure);
+    else byIssue.set(failure.issueId, [failure]);
+  }
   return issues.flatMap((issue) => {
     const evidence = byIssue.get(issue.id);
     return evidence ? [{ ...issue, failures: evidence }] : [];

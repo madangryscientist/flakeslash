@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { Viewer } from "#/auth/viewer.ts";
-import { failures, issues, organisations } from "#/db/schema.ts";
+import { failures, issues, organisations, sessions } from "#/db/schema.ts";
 import { testDb } from "#/db/test-db.ts";
-import { signInGithubUser } from "#/db/users.ts";
-import { config, stubGithub } from "#/test/github-fetch.ts";
+import { isRedirect } from "@tanstack/react-router";
+import { createSession, sessionUser, signInGithubUser } from "#/db/users.ts";
+import { TEST_TOKEN_KEY, config, stubGithub, tokens } from "#/test/github-fetch.ts";
 import { access, issuesFor } from "./access.ts";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -30,7 +31,11 @@ async function viewer(): Promise<Viewer> {
     name: null,
     avatarUrl: null,
   });
-  return { user, db, apiBase: config.apiBase, accessToken: "ghu_ada" };
+  const store = { db, tokenKey: TEST_TOKEN_KEY };
+  const cookie = await createSession(store, ADA, tokens(new Date(), 8 * 60 * 60 * 1000));
+  const session = await sessionUser(store, cookie);
+  if (!session) throw new Error("no session");
+  return { user, db, sessionId: session.id, apiBase: config.apiBase, accessToken: "ghu_ada" };
 }
 
 function failure(repo: string, jobId: number, issueId = "key:boom") {
@@ -104,6 +109,25 @@ describe("repo access", () => {
     });
     expect(await access(v, ACME, ["acme/app", "acme/docs"], "write")).toEqual(["acme/app"]);
     expect(await access(v, ACME, ["acme/app"], "admin")).toEqual([]);
+  });
+
+  test("a repo of another owner is refused at every level, admin included", async () => {
+    const v = await viewer();
+    const calls = stubGithub({});
+    for (const level of ["view", "write", "admin"] as const)
+      expect(await access(v, ADA_ORG, ["acme/secret"], level)).toEqual([]);
+    expect(calls).toEqual([]);
+  });
+
+  test("a token GitHub no longer takes ends the session and sends the person to sign in", async () => {
+    const v = await viewer();
+    stubGithub({
+      "GET /repos/acme/app": () => ({ status: 401, body: { message: "Bad credentials" } }),
+    });
+    const thrown = await access(v, ACME, ["acme/app"], "view").catch((error: unknown) => error);
+    expect(isRedirect(thrown)).toBe(true);
+    const [row] = await v.db.select().from(sessions);
+    expect(row).toBeUndefined();
   });
 
   test("GitHub is asked once per repo in a request", async () => {

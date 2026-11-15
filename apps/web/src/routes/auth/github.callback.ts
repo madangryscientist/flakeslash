@@ -14,7 +14,7 @@ export const Route = createFileRoute("/auth/github/callback")({
           config: githubConfig,
           getCookie,
           deleteCookie,
-          exchangeCode: (config, code, callback) => exchangeCode(config, code, callback),
+          exchangeCode,
           readProfile,
           signInUser: async (profile) => (await signInGithubUser(database(), profile)).id,
           startSession,
