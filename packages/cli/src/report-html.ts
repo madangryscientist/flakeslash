@@ -9,6 +9,8 @@ import { coverageLine } from "./coverage-line.ts";
 export interface ReportInput {
   /** The ranked issues, in rank order. */
   ranked: readonly RankedIssue[];
+  /** The failing issues left out of the ranking: no flaky commit and not a suspect. */
+  unranked: number;
   /** The excerpt rows of the scanned repos, by the job's page (`url`). */
   excerpts: ReadonlyMap<string, JobExcerpt>;
   /** The repos this run scanned. */
@@ -192,6 +194,7 @@ main { max-width: 72rem; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
 h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
 h2 { font-size: 1.1rem; margin: 0; overflow-wrap: anywhere; }
 .meta { color: var(--muted); margin: 0 0 1.5rem; overflow-wrap: anywhere; }
+.unranked { color: var(--muted); margin: 0 0 1.5rem; overflow-wrap: anywhere; }
 .coverage { margin: -0.75rem 0 1.5rem; padding: 0; list-style: none; color: var(--muted); overflow-wrap: anywhere; }
 .issue { background: var(--card); border: 1px solid var(--line); border-radius: 0.6rem; padding: 1rem; margin: 0 0 1rem; min-width: 0; }
 .issue header { display: flex; gap: 0.6rem; align-items: baseline; min-width: 0; }
@@ -208,12 +211,23 @@ pre { background: var(--code); border-radius: 0.4rem; padding: 0.7rem; margin: 0
 a { color: var(--link); }
 `;
 
+/** The line saying how many failing issues are not ranked; empty at 0. */
+function unrankedHtml(input: ReportInput): string {
+  if (input.unranked === 0) return "";
+  const what = input.unranked === 1 ? "1 failing issue is" : `${input.unranked} failing issues are`;
+  return `<p class="unranked">${what} not ranked: none failed and passed on one commit, and none is a suspect.</p>`;
+}
+
 /** The whole report as one HTML document. */
 export function reportHtml(input: ReportInput): string {
   const repos = input.repos.map(escapeHtml).join(", ");
+  const empty =
+    input.unranked > 0
+      ? "No flake candidates in the last 30 days."
+      : "No issues with a failed job in the last 30 days.";
   const body =
     input.ranked.length === 0
-      ? `<p>No issues with a failed job in the last 30 days.</p>`
+      ? `<p>${empty}</p>`
       : input.ranked.map((issue) => cardHtml(issue, input.excerpts)).join("\n");
   return [
     `<!doctype html>`,
@@ -229,6 +243,7 @@ export function reportHtml(input: ReportInput): string {
     `<h1>FlakeSlash report</h1>`,
     `<p class="meta">${repos} | ${escapeHtml(input.now)}</p>`,
     coverageHtml(input),
+    unrankedHtml(input),
     body,
     `</main>`,
     `</body>`,

@@ -247,3 +247,22 @@ export function rankIssues(input: RankInput): RankedIssue[] {
   }
   return ranked.toSorted(compareRanked).map((entry, index) => ({ ...entry, rank: index + 1 }));
 }
+
+/**
+ * The ranking of flake candidates: the entries of `ranked` with flake evidence, a flaky commit or a
+ * suspect. Those with a flaky commit come first, then the suspect-only ones, each group in `rankIssues`'s
+ * order; `rank` is renumbered from 1. `unranked` is how many entries were left out. Pure: the input is
+ * not changed.
+ */
+export function flakeRanking(ranked: readonly RankedIssue[]): {
+  ranked: RankedIssue[];
+  unranked: number;
+} {
+  const kept = ranked.filter((entry) => entry.flakyCommits > 0 || entry.suspect);
+  const flakyFirst = (a: RankedIssue, b: RankedIssue): number =>
+    Number(b.flakyCommits > 0) - Number(a.flakyCommits > 0) || compareRanked(a, b);
+  return {
+    ranked: kept.toSorted(flakyFirst).map((entry, index) => ({ ...entry, rank: index + 1 })),
+    unranked: ranked.length - kept.length,
+  };
+}

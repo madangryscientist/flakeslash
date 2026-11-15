@@ -17,8 +17,8 @@ bunx @hackcove/flakeslash scan owner/repo
 
 `scan` keeps what it reads in a local SQLite store (`.flakeslash/flakeslash.db` by default), so a
 second scan fetches only what is new. It prints the jobs that both failed and passed on one commit,
-groups each failure into an issue, and writes `report.html` next to the store with the issues
-ranked by recent commits.
+groups each failure into an issue, and writes `report.html` next to the store with the flake candidates
+(issues that failed and passed on one commit, or suspects) ranked by recent commits.
 
 - `scan <owner/repo>... [--since <date>] [--store <path>] [--json]`: scan one or more repos.
 - `issue list`, `issue confirm|dismiss|rename|merge|split`: correct the issue catalogue.

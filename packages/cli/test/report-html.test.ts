@@ -40,6 +40,7 @@ describe("reportHtml", () => {
       excerpts: new Map([[URL, excerpt]]),
       repos: ["acme/app"],
       coverage: [],
+      unranked: 0,
       now: "2026-12-01T00:00:00.000Z",
     });
 
@@ -58,6 +59,7 @@ describe("reportHtml", () => {
       ]),
       repos: ["acme/app"],
       coverage: [],
+      unranked: 0,
       now: "2026-12-01T00:00:00.000Z",
     });
 
@@ -71,6 +73,7 @@ describe("reportHtml", () => {
       excerpts: new Map(),
       repos: ["acme/app"],
       coverage: [],
+      unranked: 0,
       now: "2026-12-01T00:00:00.000Z",
     });
 
@@ -79,6 +82,41 @@ describe("reportHtml", () => {
     for (const token of ["--bg:", "--fg:", "--muted:", "--line:", "--code:", "--link:"]) {
       expect(dark).toContain(token);
     }
+  });
+
+  describe("not-ranked line", () => {
+    const base = {
+      excerpts: new Map(),
+      repos: ["acme/app"],
+      coverage: [],
+      now: "2026-12-01T00:00:00.000Z",
+    };
+
+    it("says how many failing issues are not ranked, after the head", () => {
+      const html = reportHtml({ ...base, ranked: [ranked], unranked: 3 });
+      expect(html).toContain(
+        `<p class="unranked">3 failing issues are not ranked: none failed and passed on one commit, and none is a suspect.</p>`,
+      );
+      expect(html.indexOf('class="unranked"')).toBeGreaterThan(html.indexOf('class="meta"'));
+      expect(html.indexOf('class="unranked"')).toBeLessThan(html.indexOf('class="issue"'));
+    });
+
+    it("has no line when every failing issue is ranked", () => {
+      const html = reportHtml({ ...base, ranked: [ranked], unranked: 0 });
+      expect(html).not.toContain('<p class="unranked"');
+      expect(html).not.toContain("not ranked");
+    });
+
+    it("says there are no flake candidates when every failing issue was left out", () => {
+      const html = reportHtml({ ...base, ranked: [], unranked: 2 });
+      expect(html).toContain("<p>No flake candidates in the last 30 days.</p>");
+      expect(html).not.toContain("No issues with a failed job");
+    });
+
+    it("keeps the empty text when nothing failed", () => {
+      const html = reportHtml({ ...base, ranked: [], unranked: 0 });
+      expect(html).toContain("<p>No issues with a failed job in the last 30 days.</p>");
+    });
   });
 
   describe("PR list", () => {
@@ -183,6 +221,7 @@ function withRate(rate: number | null, flakyCommits: number, ranCommits: number)
     excerpts: new Map(),
     repos: ["acme/app"],
     coverage: [],
+    unranked: 0,
     now: "2026-12-01T00:00:00.000Z",
   };
 }
@@ -222,6 +261,7 @@ function shownLines(log: string, latestFailure: RankedIssue["latestFailure"]): s
     excerpts: new Map([[URL, excerpt]]),
     repos: ["acme/app"],
     coverage: [],
+    unranked: 0,
     now: "2026-12-01T00:00:00.000Z",
   });
   const match = /<pre>([\s\S]*?)<\/pre>/.exec(html);

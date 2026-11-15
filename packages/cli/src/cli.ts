@@ -38,7 +38,8 @@ cuts it down to the lines around the failure, removes secrets, and keeps that ex
 the full log. The whole log is never stored. Each failure is then grouped into an issue (the same
 crash with other ports or times is one issue; known crashes are named by kind), with no model.
 The token comes from GITHUB_TOKEN. When every repo is scanned, scan also writes report.html next to the
-store: the issues ranked by commits in the last 30 days, each with its flake rate, PRs and log excerpt.
+store: the flake candidates ranked by commits in the last 30 days, each with its flake rate, PRs and
+log excerpt. Only flake candidates are ranked: issues that failed and passed on one commit, or suspects.
 
 scan explains the failures no known signature recognises, with your own OpenAI-compatible endpoint.
 With no endpoint named, nothing is sent anywhere and the summary says explanations are off. Naming

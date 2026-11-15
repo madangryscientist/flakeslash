@@ -84,6 +84,37 @@ export function routesOf(...runs: [string, number, Reply][]): Record<string, Rep
   return routes;
 }
 
+/**
+ * `routesOf`, plus a passing rerun of each run in `passedAgain` on the same commit, an hour later (run id
+ * plus 100), so the first run's failure is a proven flake.
+ */
+export function flakyRoutesOf(
+  runs: [string, number, Reply][],
+  passedAgain: [string, number][],
+): Record<string, Reply> {
+  const routes = routesOf(...runs);
+  const byRepo = new Map<string, unknown[]>();
+  for (const [repo, runId, log] of runs) {
+    byRepo.set(repo, [...(byRepo.get(repo) ?? []), failedRun(repo, runId, log)[repo]?.run]);
+  }
+  for (const [repo, runId] of passedAgain) {
+    const rerunId = runId + 100;
+    const sha = shaOf(runId);
+    byRepo.set(repo, [
+      ...(byRepo.get(repo) ?? []),
+      runOf(rerunId, "2026-11-04T01:00:00Z", { head_sha: sha }),
+    ]);
+    routes[jobsPath(rerunId, 1, repo)] = jobsOf(
+      job(rerunId * 10, rerunId, {
+        head_sha: sha,
+        html_url: `https://github.com/${repo}/actions/runs/${rerunId}/job/${rerunId * 10}`,
+      }),
+    );
+  }
+  for (const [repo, list] of byRepo) routes[runsPath(repo)] = runsOf(...list);
+  return routes;
+}
+
 interface Outcome {
   code: number;
   out: string;
