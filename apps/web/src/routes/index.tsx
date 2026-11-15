@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { describeEngine } from "@hackcove/flakeslash-engine";
+import { describeEngine } from "@hackcove/flakeslash-engine/describe";
 import { AppShell, PageHeading } from "@hackcove/ui-react";
 
 export const Route = createFileRoute("/")({ component: Home });

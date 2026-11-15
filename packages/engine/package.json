@@ -5,7 +5,8 @@
   "license": "Elastic-2.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./describe": "./src/describe.ts"
   },
   "devDependencies": {
     "@types/bun": "1.4.4",
