@@ -20,15 +20,11 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-env:
-  # The Bun the repo is built and pinned against (.tool-versions).
-  BUN_VERSION: "1.4.2"
+  # A push to main writes the moon remote cache: a running main push is never cancelled by a newer push.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   gate:
-    name: Gate (typecheck, lint, format, test)
     environment: ${{ github.event_name == 'push' && 'moon-cache-write' || '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -44,7 +40,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          bun-version-file: .tool-versions
       - run: bun scripts/check-workflows.ts .github/workflows/*.yml
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
@@ -57,7 +53,6 @@ jobs:
         env: *moon-remote-token
 
   changes:
-    name: Did an app change?
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -85,7 +80,6 @@ jobs:
           fi
 
   apps:
-    name: Apps gate (build, e2e, deploy dry run)
     environment: ${{ github.event_name == 'push' && 'moon-cache-write' || '' }}
     needs: changes
     if: needs.changes.outputs.apps == 'true'
@@ -103,7 +97,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          bun-version-file: .tool-versions
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
