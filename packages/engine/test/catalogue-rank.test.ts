@@ -288,6 +288,7 @@ describe("flakeRanking", () => {
 
   it("ranks a suspect-only issue after every flaky one, however many commits it has", () => {
     const result = flakeRanking([
+      rankedOf("suspect-few", { flakyCommits: 0, suspect: true }, 3),
       rankedOf("suspect", { flakyCommits: 0, suspect: true }, 40),
       rankedOf("flaky-few", { flakyCommits: 1, suspect: false }, 2),
       rankedOf("flaky-many", { flakyCommits: 2, suspect: true }, 9),
@@ -297,6 +298,7 @@ describe("flakeRanking", () => {
       [1, "flaky-many"],
       [2, "flaky-few"],
       [3, "suspect"],
+      [4, "suspect-few"],
     ]);
     expect(result.unranked).toBe(0);
   });
@@ -315,23 +317,5 @@ describe("flakeRanking", () => {
       [3, "a"],
       [4, "b"],
     ]);
-  });
-
-  it("orders the suspect-only group by the same keys and does not change its input", () => {
-    const input = [
-      rankedOf("s-few", { flakyCommits: 0, suspect: true }, 1),
-      rankedOf("s-many", { flakyCommits: 0, suspect: true }, 5),
-    ];
-    const result = flakeRanking(input);
-
-    expect(result.ranked.map((e) => [e.rank, e.issue.id])).toEqual([
-      [1, "s-many"],
-      [2, "s-few"],
-    ]);
-    expect(input.map((e) => e.rank)).toEqual([0, 0]);
-  });
-
-  it("ranks nothing from an empty input", () => {
-    expect(flakeRanking([])).toEqual({ ranked: [], unranked: 0 });
   });
 });

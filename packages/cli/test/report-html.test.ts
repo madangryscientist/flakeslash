@@ -92,12 +92,19 @@ describe("reportHtml", () => {
       now: "2026-12-01T00:00:00.000Z",
     };
 
-    it("says how many failing issues are not ranked, after the head", () => {
-      const html = reportHtml({ ...base, ranked: [ranked], unranked: 3 });
+    it("says how many failing issues are not ranked, after the meta and coverage lines", () => {
+      const coverage = [
+        {
+          repo: "acme/app",
+          coverage: { read: 4, noJobs: 0, noJobsByConclusion: {}, stillRunning: 0 },
+        },
+      ];
+      const html = reportHtml({ ...base, coverage, ranked: [ranked], unranked: 3 });
       expect(html).toContain(
         `<p class="unranked">3 failing issues are not ranked: none failed and passed on one commit, and none is a suspect.</p>`,
       );
-      expect(html.indexOf('class="unranked"')).toBeGreaterThan(html.indexOf('class="meta"'));
+      expect(html.indexOf('class="unranked"')).toBeGreaterThan(html.indexOf('class="coverage"'));
+      expect(html.indexOf('class="coverage"')).toBeGreaterThan(html.indexOf('class="meta"'));
       expect(html.indexOf('class="unranked"')).toBeLessThan(html.indexOf('class="issue"'));
     });
 
