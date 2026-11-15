@@ -1,13 +1,13 @@
 /**
  * The daily expiry: `expireOrg` for every organisation with a run to expire, smoke ones too, through one D1 handle capped at
- * `D1_STATEMENT_CAP`. On the cap it stops and logs; every step is idempotent, so the next day carries on.
+ * `SCAN_D1_CAP` (`d1CapOf`). On the cap it stops and logs; every step is idempotent, so the next day carries on.
  */
 import { asc, lt, min } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import type { BatchDb } from "#/db/d1-store.ts";
 import type { Db } from "#/db/db.ts";
 import * as schema from "#/db/schema.ts";
-import { capStatements, D1_STATEMENT_CAP, isCapReached } from "#/scan/d1-cap.ts";
+import { capStatements, d1CapOf, isCapReached } from "#/scan/d1-cap.ts";
 import { log as workerLog } from "#/server/log.ts";
 import { expireOrg } from "./expire.ts";
 import { cutoffOf } from "./kept.ts";
@@ -51,11 +51,11 @@ async function expireOne(db: BatchDb, orgId: number, now: string, log: ExpireDep
 
 /** Runs the expiry for every organisation. Nothing throws out of it: a failure is a log line. */
 export async function expireAll(
-  env: { DB: D1Database },
+  env: { DB: D1Database; SCAN_D1_CAP?: number | string },
   deps: Partial<ExpireDeps> = {},
 ): Promise<void> {
   const log = deps.log ?? workerLog;
-  const db = deps.db ?? drizzle(capStatements(env.DB, D1_STATEMENT_CAP), { schema });
+  const db = deps.db ?? drizzle(capStatements(env.DB, d1CapOf(env)), { schema });
   const now = deps.now ?? new Date().toISOString();
   try {
     for (const id of await dueOrgs(db, cutoffOf(now))) await expireOne(db, id, now, log);

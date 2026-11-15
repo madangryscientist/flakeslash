@@ -1,12 +1,19 @@
 /**
- * D1 allows 1,000 queries per Worker invocation (paid). The batch's bounds keep it well under that on
- * the measured worst mix, but what a scan writes per log grows with the distinct failures in it (a new
- * issue each), which no request budget bounds. So the batch's D1 handle refuses statements past this
- * cap: the scan in progress throws and is logged, what it wrote stays, and the next batch carries on.
+ * D1 allows 50 queries per Worker invocation on the free plan (1,000 paid). The batch's bounds keep
+ * it under that on the measured cases, but what a scan writes per log grows with the distinct failures
+ * in it (a new issue each), which no request budget bounds. So the batch's D1 handle refuses statements
+ * past the cap, the `SCAN_D1_CAP` var: the scan in progress throws and is logged, what it wrote stays,
+ * and the next batch carries on. This is the cap when the var is unset or not a positive whole number.
  */
 export const D1_STATEMENT_CAP = 950;
 
-/** The batch reached `D1_STATEMENT_CAP`: an expected stop, not a failure. */
+/** The cap from the `SCAN_D1_CAP` var, or `D1_STATEMENT_CAP` when it is unset or invalid. */
+export function d1CapOf(env: { SCAN_D1_CAP?: number | string }): number {
+  const n = Number(env.SCAN_D1_CAP);
+  return Number.isInteger(n) && n > 0 ? n : D1_STATEMENT_CAP;
+}
+
+/** The batch reached its D1 statement cap: an expected stop, not a failure. */
 export class D1CapReached extends Error {
   constructor(cap: number) {
     super(`the batch reached its cap of ${cap} D1 statements`);

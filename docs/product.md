@@ -24,7 +24,8 @@ It is source-available under the Elastic License 2.0 and self-hostable. This fil
     carries on from what is already stored.
   - The App asks for every permission it will need now, so an installed organisation never has to
     approve it again: Actions read, Contents read (for `CODEOWNERS` and compares), Checks write (for
-    the PR check), Metadata read, and Members read (for sign-in, which an organisation admin approves).
+    the PR check), Metadata read, Pull requests read (which pull request a run belongs to), and Members
+    read (for sign-in, which an organisation admin approves).
 - **Upload.** `flakeslash upload` is how new data arrives and how a CI system without a reader joins
   in. It takes any log or text file. JUnit XML is welcome and gives exact test names, but it is never
   required.

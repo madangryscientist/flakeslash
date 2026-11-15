@@ -6,15 +6,16 @@
   "main": "src/server.ts",
   "observability": { "enabled": true },
   "upload_source_maps": true,
-  // The id is a placeholder: creating the real D1 database is the first deploy's job (a human
-  // step), not this scaffold's. Local dev and tests use local state. There is no route and no
-  // custom domain either: no domain is chosen yet, and attaching one is part of that first
-  // deploy.
+  // The dashboard's custom domain. Cloudflare creates and owns its DNS record and certificate: never
+  // add a record for this hostname by hand, or the next deploy fails with "hostname already has a DNS
+  // record".
+  "routes": [{ "pattern": "flakeslash.slashslash.build", "custom_domain": true }],
+  // The production database. Local dev and tests use local state.
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "flakeslash",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "4a8f9147-cba1-4040-925b-2f90ccff31a9",
       "migrations_dir": "drizzle",
     },
   ],
@@ -22,7 +23,7 @@
   // of 32 random bytes; it seals the GitHub tokens a session keeps) are secrets: `wrangler secret
   // put`, or `.dev.vars` locally). No value of either is in the tree.
   // GITHUB_APP_PRIVATE_KEY is the App's own key, for the hourly scan (a secret too). GITHUB_APP_ID
-  // is empty until the App is registered; with the id or the key empty, the scan logs one line and
+  // and GITHUB_APP_CLIENT_ID are public; with the id or the key empty, the scan logs one line and
   // calls nothing.
   "secrets": {
     "required": ["GITHUB_APP_CLIENT_SECRET", "TOKEN_KEY", "GITHUB_APP_PRIVATE_KEY"],
@@ -32,24 +33,29 @@
   // picks the job by the cron string, so a change here changes EXPIRE_CRON there too.
   "triggers": { "crons": ["0 * * * *", "30 3 * * *"] },
   "vars": {
-    "GITHUB_APP_CLIENT_ID": "",
+    "GITHUB_APP_CLIENT_ID": "Iv23liA7FCdQbymsYJy5",
     "GITHUB_OAUTH_BASE": "https://github.com",
     "GITHUB_API_BASE": "https://api.github.com",
-    "GITHUB_APP_ID": "",
-    // One batch's bounds. SCAN_REQUEST_BUDGET counts every GitHub request; SCAN_REPOS_PER_BATCH
-    // bounds the D1 statements, which the request budget does not. Both keep an invocation under
-    // 1,000 subrequests and 1,000 D1 statements (every statement counted, batched or not), measured
-    // in src/scan/hourly-bounds.test.ts at these values:
-    //   a backfill larger than one batch, every log kept: 200 requests, at most 485 statements;
-    //   20 repos with nothing new: 23 requests, 183 statements;
-    //   the worst mix, 19 repos with nothing new, then new logs of two failed tests each: 200 requests, 891 statements.
-    // 800 and 50 (the first measure) reached 2,400 statements on a batch of log reads, and 300 and
-    // 20 reached 1,008 on the worst mix with one test per log (these values: two tests per log).
-    // A log with more distinct failures writes more (a new issue each), which no request budget
-    // bounds, so the batch's D1 handle also refuses statements past D1_STATEMENT_CAP (950,
-    // src/scan/d1-cap.ts): the scan in progress stops there, and the next batch carries on.
-    "SCAN_REQUEST_BUDGET": 200,
-    "SCAN_REPOS_PER_BATCH": 20,
+    "GITHUB_APP_ID": "5771126",
+    // One batch's bounds, sized for the free plan (10 ms CPU and 50 subrequests per invocation, a D1
+    // query counting as one and a batch of statements as one query). SCAN_REQUEST_BUDGET counts every GitHub request; SCAN_REPOS_PER_BATCH and
+    // SCAN_D1_CAP bound the D1 statements, which the request budget does not: the batch's D1 handle
+    // refuses statements past the cap (src/scan/d1-cap.ts, 950 when unset), the scan in progress
+    // stops there, and the next batch carries on. Measured in src/scan/hourly-bounds.test.ts at these
+    // values, every statement counted (batched or not):
+    //   2 repos with nothing new: 5 requests, 21 statements;
+    //   discovery of an installation with 20 repos, then its first 2: 5 requests, 21 statements;
+    //   a batch that reads new logs (about four statements each) meets the cap: the worst mix, a
+    //   repo with nothing new then one with only logs left, would run 121 uncapped and stops at 45;
+    //   a 40-run backfill over 2 repos lands every log in 9 batches, the cap ending 6 of them.
+    // At budget 20 and 1 repo a log-reading batch still runs 60 to 76 uncapped, so the cap, not a
+    // smaller budget, is what bounds a log-reading batch. GitHub requests and D1 queries share the 50:
+    // a capped batch can pass it, so the live check reads Workers Logs for that and for CPU.
+    // Discovery runs first, two requests and two statements per installation: past about 14
+    // installations it spends the whole budget.
+    "SCAN_REQUEST_BUDGET": 30,
+    "SCAN_REPOS_PER_BATCH": 2,
+    "SCAN_D1_CAP": 45,
   },
   // `CLOUDFLARE_ENV=e2e`: the Playwright build. Bindings and vars are not inherited by an env, so they
   // repeat here. The Playwright run's `vite.config.ts` points the GitHub bases at its stand-in
@@ -70,8 +76,9 @@
         "GITHUB_OAUTH_BASE": "https://github.com",
         "GITHUB_API_BASE": "https://api.github.com",
         "GITHUB_APP_ID": "",
-        "SCAN_REQUEST_BUDGET": 200,
-        "SCAN_REPOS_PER_BATCH": 20,
+        "SCAN_REQUEST_BUDGET": 30,
+        "SCAN_REPOS_PER_BATCH": 2,
+        "SCAN_D1_CAP": 45,
       },
     },
   },
