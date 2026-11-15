@@ -55,6 +55,22 @@ function gather(overrides: Partial<JobRecord> = {}): JobRecord {
   });
 }
 
+/** Run `runId`: the sibling fails, then the gather job fails after it, or before it when `early`. */
+const runOf = (runId: number, early = false) => {
+  const failed = job({ ...sibling, runId, jobId: runId * 10 });
+  const merge = gather({
+    runId,
+    jobId: runId * 10 + 1,
+    ...(early ? { startedAt: "2026-11-01T10:00:00Z" } : {}),
+  });
+  return { records: [failed, merge], failures: [failureOf(merge)] };
+};
+const ofRuns = (runs: ReturnType<typeof runOf>[]) =>
+  followOnJobs(
+    runs.flatMap((run) => run.records),
+    runs.flatMap((run) => run.failures),
+  );
+
 describe("followOnJobs", () => {
   it("names a job that started after a failed sibling and names no test", () => {
     const merge = gather();
@@ -112,5 +128,14 @@ describe("followOnJobs", () => {
     const merge = gather({ repo: "Acme/App" });
 
     expect([...followOnJobs([upper, merge], [failureOf(merge)])]).toEqual(["acme/app:2"]);
+  });
+
+  it("names a job only when it fails after a sibling in at least 80% of its failed runs", () => {
+    // 4 of 5 follow a failure: every one of the 4 is a follow-on.
+    expect(ofRuns([runOf(1), runOf(2), runOf(3), runOf(4), runOf(5, true)])).toEqual(
+      new Set(["acme/app:11", "acme/app:21", "acme/app:31", "acme/app:41"]),
+    );
+    // 3 of 4 is under 80%: none is.
+    expect(ofRuns([runOf(1), runOf(2), runOf(3), runOf(4, true)]).size).toBe(0);
   });
 });
