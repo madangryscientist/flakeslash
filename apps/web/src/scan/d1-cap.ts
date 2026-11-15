@@ -1,6 +1,6 @@
 /**
- * D1 allows 50 queries per Worker invocation on the free plan (1,000 paid). The batch's bounds keep
- * it under that on the measured cases, but what a scan writes per log grows with the distinct failures
+ * D1 allows 1,000 queries per Worker invocation on Workers Paid (a batch of statements counts as one).
+ * The batch's bounds keep it under that on the measured cases, but what a scan writes per log grows with the distinct failures
  * in it (a new issue each), which no request budget bounds. So the batch's D1 handle refuses statements
  * past the cap, the `SCAN_D1_CAP` var: the scan in progress throws and is logged, what it wrote stays,
  * and the next batch carries on. This is the cap when the var is unset or not a positive whole number.

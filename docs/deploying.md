@@ -96,14 +96,14 @@ Apply the migrations before every deploy that brings new ones.
 
 The scan's bounds are vars in `wrangler.jsonc`: `SCAN_REQUEST_BUDGET` (GitHub requests per batch),
 `SCAN_REPOS_PER_BATCH`, and `SCAN_D1_CAP` (D1 statements per batch, 950 when unset). The values in the
-repo are sized for Cloudflare's free plan, 50 subrequests per invocation, where a D1 query counts as
-one (a batch of statements is one query). On the paid plan you can raise them: 200, 20 and 950 fit
-its limits. `src/scan/hourly-bounds.test.ts` measures a batch at whatever the file says, so change the
+repo are sized for Cloudflare's Workers Paid plan: 200 GitHub requests, 20 repos and 950 D1 statements
+a batch, within 10,000 subrequests and 1,000 D1 queries per invocation (a batch of statements is one
+query). `src/scan/hourly-bounds.test.ts` measures a batch at whatever the file says, so change the
 values and the test together.
 
 Every batch first lists the App's installations, with two GitHub requests and two D1 statements for
-each one, before any repo is scanned. An App installed on many accounts therefore spends a small
-budget on discovery alone.
+each one, before any repo is scanned. An App installed on very many accounts therefore spends the
+whole budget on discovery: past about 99 installations no repo is scanned.
 
 ## Checking it
 
