@@ -70,6 +70,29 @@ describe("cutLog keeps the file line a moon failure belongs to", () => {
     expect(lines.join("\n")).not.toContain("test/b.test.ts");
   });
 
+  it("heads one window with the file line of each target that fails in it", () => {
+    const log = [
+      "##[group]Run moon run :test",
+      groupLine,
+      other("::group::test/b.test.ts:"),
+      ...quiet,
+      other("(fail) b test"),
+      failLine,
+      "##[error]Process completed with exit code 1.",
+    ].join("\n");
+
+    const found = signatures(cutLog(log), JOB);
+
+    const pairs = found.map((s) => [s.file, s.title]);
+    expect(pairs).toHaveLength(2);
+    expect(pairs).toEqual(
+      expect.arrayContaining([
+        ["test/a.test.ts", "a test"],
+        ["test/b.test.ts", "b test"],
+      ]),
+    );
+  });
+
   it("heads each failure's window with the file line after every gap", () => {
     const log = [
       "##[group]Run bun test",

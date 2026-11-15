@@ -151,13 +151,18 @@ function fileLineAbove(
   return undefined;
 }
 
-/** The moon target of the first match in the window that starts at `index`, if it carries one. */
-function windowTarget(step: string[], keep: boolean[], index: number): string | undefined {
+/**
+ * The moon targets of the matches in the window that starts at `index`. A window with no prefixed
+ * match gives `[undefined]`, which `fileLineAbove` reads as any target.
+ */
+function windowTargets(step: string[], keep: boolean[], index: number): (string | undefined)[] {
+  const targets = new Set<string>();
   for (let i = index; i < step.length && keep[i]; i++) {
     const line = step[i] ?? "";
-    if (isMatch(line)) return MOON_TARGET.exec(line)?.[1];
+    const target = MOON_TARGET.exec(line)?.[1];
+    if (target !== undefined && isMatch(line)) targets.add(target);
   }
-  return undefined;
+  return targets.size > 0 ? [...targets] : [undefined];
 }
 
 /**
@@ -181,8 +186,12 @@ function excerptStep(step: string[]): string[] {
     if (!keep[index]) return;
     if (index > previous + 1) {
       out.push(GAP);
-      const header = fileLineAbove(step, index, windowTarget(step, keep, index));
-      if (header !== undefined) out.push(step[header] ?? "");
+      const headers = new Set<number>();
+      for (const target of windowTargets(step, keep, index)) {
+        const header = fileLineAbove(step, index, target);
+        if (header !== undefined) headers.add(header);
+      }
+      for (const header of [...headers].toSorted((a, b) => a - b)) out.push(step[header] ?? "");
     }
     out.push(line);
     previous = index;
