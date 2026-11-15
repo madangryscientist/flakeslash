@@ -6,15 +6,16 @@
   "main": "src/server.ts",
   "observability": { "enabled": true },
   "upload_source_maps": true,
-  // The id is a placeholder: creating the real D1 database is the first deploy's job (a human
-  // step), not this scaffold's. Local dev and tests use local state. There is no route and no
-  // custom domain either: no domain is chosen yet, and attaching one is part of that first
-  // deploy.
+  // The dashboard's custom domain. Cloudflare creates and owns its DNS record and certificate: never
+  // add a record for this hostname by hand, or the next deploy fails with "hostname already has a DNS
+  // record".
+  "routes": [{ "pattern": "flakeslash.slashslash.build", "custom_domain": true }],
+  // The production database. Local dev and tests use local state.
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "flakeslash",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "4a8f9147-cba1-4040-925b-2f90ccff31a9",
       "migrations_dir": "drizzle",
     },
   ],
@@ -22,7 +23,7 @@
   // of 32 random bytes; it seals the GitHub tokens a session keeps) are secrets: `wrangler secret
   // put`, or `.dev.vars` locally). No value of either is in the tree.
   // GITHUB_APP_PRIVATE_KEY is the App's own key, for the hourly scan (a secret too). GITHUB_APP_ID
-  // is empty until the App is registered; with the id or the key empty, the scan logs one line and
+  // and GITHUB_APP_CLIENT_ID are public; with the id or the key empty, the scan logs one line and
   // calls nothing.
   "secrets": {
     "required": ["GITHUB_APP_CLIENT_SECRET", "TOKEN_KEY", "GITHUB_APP_PRIVATE_KEY"],
@@ -32,10 +33,10 @@
   // picks the job by the cron string, so a change here changes EXPIRE_CRON there too.
   "triggers": { "crons": ["0 * * * *", "30 3 * * *"] },
   "vars": {
-    "GITHUB_APP_CLIENT_ID": "",
+    "GITHUB_APP_CLIENT_ID": "Iv23liA7FCdQbymsYJy5",
     "GITHUB_OAUTH_BASE": "https://github.com",
     "GITHUB_API_BASE": "https://api.github.com",
-    "GITHUB_APP_ID": "",
+    "GITHUB_APP_ID": "5771126",
     // One batch's bounds. SCAN_REQUEST_BUDGET counts every GitHub request; SCAN_REPOS_PER_BATCH
     // bounds the D1 statements, which the request budget does not. Both keep an invocation under
     // 1,000 subrequests and 1,000 D1 statements (every statement counted, batched or not), measured
@@ -48,8 +49,9 @@
     // A log with more distinct failures writes more (a new issue each), which no request budget
     // bounds, so the batch's D1 handle also refuses statements past D1_STATEMENT_CAP (950,
     // src/scan/d1-cap.ts): the scan in progress stops there, and the next batch carries on.
-    "SCAN_REQUEST_BUDGET": 200,
-    "SCAN_REPOS_PER_BATCH": 20,
+    "SCAN_REQUEST_BUDGET": 30,
+    "SCAN_REPOS_PER_BATCH": 2,
+    "SCAN_D1_CAP": 45,
   },
   // `CLOUDFLARE_ENV=e2e`: the Playwright build. Bindings and vars are not inherited by an env, so they
   // repeat here. The Playwright run's `vite.config.ts` points the GitHub bases at its stand-in
@@ -70,8 +72,9 @@
         "GITHUB_OAUTH_BASE": "https://github.com",
         "GITHUB_API_BASE": "https://api.github.com",
         "GITHUB_APP_ID": "",
-        "SCAN_REQUEST_BUDGET": 200,
-        "SCAN_REPOS_PER_BATCH": 20,
+        "SCAN_REQUEST_BUDGET": 30,
+        "SCAN_REPOS_PER_BATCH": 2,
+        "SCAN_D1_CAP": 45,
       },
     },
   },

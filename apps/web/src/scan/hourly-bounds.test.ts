@@ -1,7 +1,9 @@
 /**
- * The batch's bounds at the defaults in `wrangler.jsonc`: every batch stays under 1,000 GitHub requests
- * (Workers' paid subrequest limit) and 1,000 D1 statements (D1's paid limit on queries per invocation).
- * Every statement counts, batched or not, which is stricter than Cloudflare (it counts a batch as one).
+ * The batch's bounds at the values in `wrangler.jsonc`, sized for Cloudflare's free plan (50
+ * subrequests and 50 D1 queries per invocation): every measured batch makes at most
+ * `SCAN_REQUEST_BUDGET` GitHub requests and at most `SCAN_D1_CAP` D1 statements, so the cap never
+ * cuts a normal batch. Every statement counts, batched or not, which is stricter than Cloudflare (it
+ * counts a batch as one). The database here is uncapped, so a count over the cap shows as a failure.
  */
 import { readFileSync } from "node:fs";
 import { scanRepo } from "@hackcove/flakeslash-engine";
@@ -13,7 +15,6 @@ import { text } from "#/db/test-github.ts";
 import { runBatch, type BatchDeps } from "./hourly.ts";
 import { APP, appRoutes, failedHistory, installation, stubGitHub } from "./test-app.ts";
 
-const LIMIT = 1000;
 const ORG = 1;
 const START = Date.parse("2026-11-15T12:00:00Z");
 const hour = (n: number) => new Date(START + n * 60 * 60 * 1000);
@@ -31,6 +32,7 @@ function wranglerVar(name: string): number {
 
 const budget = wranglerVar("SCAN_REQUEST_BUDGET");
 const reposPerBatch = wranglerVar("SCAN_REPOS_PER_BATCH");
+const cap = wranglerVar("SCAN_D1_CAP");
 
 /** A database and a batch runner that counts D1 statements and GitHub requests per batch. */
 function counted(routes: Record<string, Reply>, names: string[]) {
@@ -59,20 +61,20 @@ function counted(routes: Record<string, Reply>, names: string[]) {
   };
 }
 
-describe("the batch's bounds at the defaults", () => {
-  it("are what wrangler.jsonc says", () => {
-    expect({ budget, reposPerBatch }).toEqual({ budget: 200, reposPerBatch: 20 });
+describe("the batch's bounds at the values in wrangler.jsonc", () => {
+  it("are the free plan's", () => {
+    expect({ budget, reposPerBatch, cap }).toEqual({ budget: 30, reposPerBatch: 2, cap: 45 });
   });
 
   it("hold over a backfill larger than one batch, where every log is kept", async () => {
     const names = ["acme/one", "acme/two"];
     const routes = {
-      ...failedHistory("acme/one", { firstRun: 1000, runs: 150, jobsPerRun: 1, testsPerLog: 2 }),
-      ...failedHistory("acme/two", { firstRun: 2000, runs: 150, jobsPerRun: 1, testsPerLog: 2 }),
+      ...failedHistory("acme/one", { firstRun: 1000, runs: 20, jobsPerRun: 1, testsPerLog: 2 }),
+      ...failedHistory("acme/two", { firstRun: 2000, runs: 20, jobsPerRun: 1, testsPerLog: 2 }),
     };
     const run = counted(routes, names);
     const seen: { requests: number; statements: number }[] = [];
-    for (let n = 0; n < 20; n += 1) {
+    for (let n = 0; n < 40; n += 1) {
       const { result, requests, statements } = await run.batch({ now: hour(n) });
       seen.push({ requests, statements });
       if (result.stop === "all-scanned") break;
@@ -80,9 +82,8 @@ describe("the batch's bounds at the defaults", () => {
 
     expect(seen.length).toBeGreaterThan(2);
     expect(Math.max(...seen.map((s) => s.requests))).toBe(budget);
-    // Measured: 200 requests in each full batch; at most 485 statements (the batches that read logs).
-    expect(Math.max(...seen.map((s) => s.statements))).toBeLessThan(LIMIT);
-    expect((await d1Store(run.db, ORG).readFailures()).length).toBe(600);
+    expect(Math.max(...seen.map((s) => s.statements))).toBeLessThanOrEqual(cap);
+    expect((await d1Store(run.db, ORG).readFailures()).length).toBe(80);
   });
 
   it("hold when every repo of a full batch has nothing new", async () => {
@@ -93,9 +94,19 @@ describe("the batch's bounds at the defaults", () => {
     const { result, requests, statements } = await run.batch({ now: hour(1) });
 
     expect(result.scanned).toHaveLength(reposPerBatch);
-    // Measured: 23 requests and 183 statements.
-    expect(requests).toBeLessThan(LIMIT);
-    expect(statements).toBeLessThan(LIMIT);
+    expect(requests).toBeLessThanOrEqual(budget);
+    expect(statements).toBeLessThanOrEqual(cap);
+  });
+
+  it("hold on discovery of an installation with 20 repos, of which the batch scans its share", async () => {
+    const names = Array.from({ length: 20 }, (_, n) => `acme/r${String(n).padStart(2, "0")}`);
+    const routes = Object.fromEntries(names.map((name) => [runsPath(name), runsOf()]));
+    const run = counted(routes, names);
+    const { result, requests, statements } = await run.batch();
+
+    expect(result.scanned).toHaveLength(reposPerBatch);
+    expect(requests).toBeLessThanOrEqual(budget);
+    expect(statements).toBeLessThanOrEqual(cap);
   });
 
   it("hold at the worst mix: a full batch of repos, the last one's budget all on logs", async () => {
@@ -106,7 +117,7 @@ describe("the batch's bounds at the defaults", () => {
     const big = "acme/zz";
     const history = failedHistory(big, {
       firstRun: 1000,
-      runs: 400,
+      runs: 40,
       jobsPerRun: 1,
       testsPerLog: 2,
     });
@@ -129,9 +140,7 @@ describe("the batch's bounds at the defaults", () => {
 
     const { result, requests, statements } = await run.batch({ now: hour(-1) });
     expect(result.scanned.map((turn) => turn.name).at(-1)).toBe(big);
-    // Measured: 200 requests and 891 statements: the binding case. Each new log costs four (an
-    // excerpt, two new issues, the failures), and each repo about nine even when nothing is new.
     expect(requests).toBe(budget);
-    expect(statements).toBeLessThan(LIMIT);
+    expect(statements).toBeLessThanOrEqual(cap);
   });
 });

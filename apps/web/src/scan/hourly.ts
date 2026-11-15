@@ -13,7 +13,7 @@ import * as schema from "#/db/schema.ts";
 import { createGithubApp, type GithubAppConfig, type GithubFetch } from "#/github/app.ts";
 import { log as workerLog } from "#/server/log.ts";
 import { budgeted, type Budgeted } from "./budget.ts";
-import { capStatements, D1_STATEMENT_CAP, isCapReached } from "./d1-cap.ts";
+import { capStatements, d1CapOf, isCapReached } from "./d1-cap.ts";
 import { discover } from "./discover.ts";
 
 const { repos } = schema;
@@ -173,6 +173,7 @@ export interface ScanEnv {
   GITHUB_API_BASE: string;
   SCAN_REQUEST_BUDGET: number | string;
   SCAN_REPOS_PER_BATCH: number | string;
+  SCAN_D1_CAP?: number | string;
 }
 
 /** The App's config, or null when the id or the key is empty. */
@@ -195,7 +196,7 @@ function depsOf(env: ScanEnv, deps: Partial<BatchDeps>, log: BatchDeps["log"]): 
   const reposPerBatch = deps.reposPerBatch ?? countOf(env.SCAN_REPOS_PER_BATCH);
   if (budget === null || reposPerBatch === null) return null;
   return {
-    db: deps.db ?? drizzle(capStatements(env.DB, D1_STATEMENT_CAP), { schema }),
+    db: deps.db ?? drizzle(capStatements(env.DB, d1CapOf(env)), { schema }),
     fetch: deps.fetch ?? ((input, init) => fetch(input, init)),
     app: deps.app === undefined ? appConfigOf(env) : deps.app,
     budget,
