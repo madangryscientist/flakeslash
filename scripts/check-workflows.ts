@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
-// Lockdown check for the `proxmox` self-hosted runner (OB-1901).
+// Lockdown check for the `proxmox` self-hosted runner.
 //
 // Usage: bun check-workflows.ts <file.yml>...   (register.sh feeds it a repo's workflows)
 //
-// Every job whose `runs-on` could reach a runner (names `proxmox`, `desktop` (OB-1902) or
+// Every job whose `runs-on` could reach a runner (names `proxmox`, `desktop` or
 // `self-hosted`, or is an expression) must:
 //   - live in a workflow triggered only by push or pull_request
 //     (never pull_request_target, workflow_run, issue_comment or anything a fork can drive), and
