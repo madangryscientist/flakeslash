@@ -131,29 +131,43 @@ const GROUP_END_LINE = /^\s*(?:\S+ \| )?(?:##\[endgroup\]|::endgroup::)/;
 const MOON_TARGET = /^\s*(\S+) \| /;
 
 /**
- * The index of the file header that applies to the line at `index`: the nearest one above it, unless
- * a group ends first. Undefined when the step starts or a group ends before one is found. Moon
- * interleaves the lines of tasks run at once, so with a `target`, lines another task printed are
- * passed over.
+ * Follows, line by line, which file header applies at each point of a step: the latest one, unless
+ * a group has ended since. Moon interleaves the lines of tasks run at once, so each target has its
+ * own; a line with no prefix applies to every target. One pass, so the cut stays linear.
  */
-function fileLineAbove(
-  step: string[],
-  index: number,
-  target: string | undefined,
-): number | undefined {
-  for (let i = index - 1; i >= 0; i--) {
-    const line = step[i] ?? "";
-    const lineTarget = MOON_TARGET.exec(line)?.[1];
-    if (target !== undefined && lineTarget !== undefined && lineTarget !== target) continue;
-    if (GROUP_END_LINE.test(line)) return undefined;
-    if (FILE_LINE.test(line)) return i;
+class FileLines {
+  /** The header for any target, from every line. */
+  private any: number | undefined;
+  /** The header set by the latest unprefixed line, for targets with no line of their own since. */
+  private shared: number | undefined;
+  private readonly byTarget = new Map<string, number | undefined>();
+
+  /** Reads the line at `index`, after the windows that start at it have asked. */
+  read(line: string, index: number): void {
+    let header: number | undefined;
+    if (GROUP_END_LINE.test(line)) header = undefined;
+    else if (FILE_LINE.test(line)) header = index;
+    else return;
+    this.any = header;
+    const target = MOON_TARGET.exec(line)?.[1];
+    if (target === undefined) {
+      this.shared = header;
+      this.byTarget.clear();
+    } else {
+      this.byTarget.set(target, header);
+    }
   }
-  return undefined;
+
+  /** The header that applies to `target`'s next line, or to any target's when it is undefined. */
+  for(target: string | undefined): number | undefined {
+    if (target === undefined) return this.any;
+    return this.byTarget.has(target) ? this.byTarget.get(target) : this.shared;
+  }
 }
 
 /**
  * The moon targets of the matches in the window that starts at `index`. A window with no prefixed
- * match gives `[undefined]`, which `fileLineAbove` reads as any target.
+ * match gives `[undefined]`, which `FileLines` reads as any target.
  */
 function windowTargets(step: string[], keep: boolean[], index: number): (string | undefined)[] {
   const targets = new Set<string>();
@@ -163,6 +177,16 @@ function windowTargets(step: string[], keep: boolean[], index: number): (string 
     if (target !== undefined && isMatch(line)) targets.add(target);
   }
   return targets.size > 0 ? [...targets] : [undefined];
+}
+
+/** The file headers that apply to the window starting at `index`, one per target, in log order. */
+function windowHeaders(step: string[], keep: boolean[], index: number, files: FileLines): string[] {
+  const headers = new Set<number>();
+  for (const target of windowTargets(step, keep, index)) {
+    const header = files.for(target);
+    if (header !== undefined) headers.add(header);
+  }
+  return [...headers].toSorted((a, b) => a - b).map((header) => step[header] ?? "");
 }
 
 /**
@@ -181,20 +205,17 @@ function excerptStep(step: string[]): string[] {
   });
 
   const out: string[] = [];
+  const files = new FileLines();
   let previous = -1;
   step.forEach((line, index) => {
-    if (!keep[index]) return;
-    if (index > previous + 1) {
-      out.push(GAP);
-      const headers = new Set<number>();
-      for (const target of windowTargets(step, keep, index)) {
-        const header = fileLineAbove(step, index, target);
-        if (header !== undefined) headers.add(header);
+    if (keep[index]) {
+      if (index > previous + 1) {
+        out.push(GAP, ...windowHeaders(step, keep, index, files));
       }
-      for (const header of [...headers].toSorted((a, b) => a - b)) out.push(step[header] ?? "");
+      out.push(line);
+      previous = index;
     }
-    out.push(line);
-    previous = index;
+    files.read(line, index);
   });
   return out;
 }
