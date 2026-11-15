@@ -13,7 +13,7 @@ export CLOUDFLARE_API_TOKEN=...   # a token that can edit Workers, D1 and the zo
 export CLOUDFLARE_ACCOUNT_ID=...
 ```
 
-Keep both out of the tree and out of shell history.
+Keep both out of the tree: set them from your password manager or a file outside the repo.
 
 ## 1. The database
 
@@ -44,6 +44,7 @@ with this manifest, where `<host>` is your dashboard's hostname:
     "contents": "read",
     "checks": "write",
     "metadata": "read",
+    "pull_requests": "read",
     "members": "read"
   }
 }
@@ -67,19 +68,11 @@ The zone must be on the same Cloudflare account. Cloudflare creates the DNS reco
 certificate on the first deploy and owns both. Do not add a record for the hostname yourself: the
 deploy then fails with "hostname already has a DNS record".
 
-## 4. Migrations, then the deploy
+## 4. The secrets
 
-```bash
-bunx wrangler d1 migrations apply DB --remote
-bun run build
-bunx wrangler deploy
-```
-
-Apply the migrations before every deploy that brings new ones.
-
-## 5. The secrets
-
-The Worker refuses to serve without them. `wrangler secret put` reads each value from stdin:
+`wrangler.jsonc` lists them under `secrets.required`, so `wrangler deploy` refuses until all three are
+set, the first deploy included. Set them first: `wrangler secret put` reads each value from stdin,
+and offers to create the Worker when it does not exist yet.
 
 ```bash
 bunx wrangler secret put GITHUB_APP_CLIENT_SECRET   # the App's client secret
@@ -89,16 +82,32 @@ openssl rand -base64 32 | bunx wrangler secret put TOKEN_KEY
 
 `TOKEN_KEY` seals the GitHub tokens a session keeps. Changing it signs everyone out.
 
+## 5. Migrations, then the deploy
+
+```bash
+bunx wrangler d1 migrations apply DB --remote
+bun run build
+bunx wrangler deploy
+```
+
+Apply the migrations before every deploy that brings new ones.
+
 ## Sizing
 
 The scan's bounds are vars in `wrangler.jsonc`: `SCAN_REQUEST_BUDGET` (GitHub requests per batch),
 `SCAN_REPOS_PER_BATCH`, and `SCAN_D1_CAP` (D1 statements per batch, 950 when unset). The values in the
-repo fit Cloudflare's free plan (50 subrequests and 50 D1 queries per invocation). On the paid plan
-you can raise them: 200, 20 and 950 fit its limits of 1,000 each. `src/scan/hourly-bounds.test.ts`
-measures a batch at whatever the file says, so change the values and the test together.
+repo are sized for Cloudflare's free plan, 50 subrequests per invocation, where a D1 query counts as
+one (a batch of statements is one query). On the paid plan you can raise them: 200, 20 and 950 fit
+its limits. `src/scan/hourly-bounds.test.ts` measures a batch at whatever the file says, so change the
+values and the test together.
+
+Every batch first lists the App's installations, with two GitHub requests and two D1 statements for
+each one, before any repo is scanned. An App installed on many accounts therefore spends a small
+budget on discovery alone.
 
 ## Checking it
 
-Open `https://<host>`: it renders signed out. Sign in with GitHub, install the App on a few repos,
-and the catalogue fills within an hour or two. Workers Logs (on, through `observability`) show each
+Open `https://<host>`: it renders signed out. Sign in with GitHub and install the App on a few repos.
+Each hourly batch scans a few repos, the one scanned longest ago first, so the catalogue fills over
+the next hours, and a long history takes several batches per repo. Workers Logs (on, through `observability`) show each
 batch's line, and any `exceededCpu` or D1 limit error.

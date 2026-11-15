@@ -4,8 +4,8 @@ FlakeSlash is a source-available tool for finding flaky tests: detect them in an
 from a CLI and a hosted dashboard. The marketing page is https://slashslash.build/flakeslash, built in the slashslash repo; the dashboard runs at https://flakeslash.slashslash.build.
 
 **Built so far:** the engine and the `flakeslash` CLI do the local scan. The dashboard signs a person in
-with GitHub, scans every repo the GitHub App is installed on each hour, keeps the results in D1 and
-ranks each organisation's flake candidates. Upload from the CLI arrives as its own ticket, and
+with GitHub, scans the repos the GitHub App is installed on in hourly batches (they take turns), keeps
+the results in D1 and ranks each organisation's flake candidates. Upload from the CLI arrives as its own ticket, and
 [`docs/product.md`](docs/product.md) is the design it builds to.
 
 This file is the operating agreement for contributors and agents working here: the gate, the landing
@@ -93,11 +93,14 @@ The dashboard is live at https://flakeslash.slashslash.build, a custom domain on
 `apps/web/wrangler.jsonc`, with the production D1 database's id at its top level (`env.e2e` keeps a
 placeholder). [`docs/deploying.md`](docs/deploying.md) has the deploy steps.
 
-- **It runs on Cloudflare's free plan**: 10 ms of CPU, 50 subrequests and 50 D1 queries per
-  invocation. The hourly scan's vars are sized for it: `SCAN_REQUEST_BUDGET` 30, `SCAN_REPOS_PER_BATCH`
-  2 and `SCAN_D1_CAP` 45. A batch that reads new logs meets the cap and the next one carries on;
-  `src/scan/hourly-bounds.test.ts` measures each case, and the comment above the vars has the counts.
-  CPU cannot be measured locally: read it from Workers Logs.
+- **It runs on Cloudflare's free plan**: 10 ms of CPU and 50 subrequests per invocation, where a D1
+  query counts as a subrequest (a batch of statements as one). The hourly scan's vars are sized for
+  it: `SCAN_REQUEST_BUDGET` 30, `SCAN_REPOS_PER_BATCH` 2 and `SCAN_D1_CAP` 45. A batch that reads new
+  logs meets the cap and the next one carries on; `src/scan/hourly-bounds.test.ts` measures each case,
+  and the comment above the vars has the counts. GitHub requests and D1 queries together can pass 50
+  on a log-reading batch, and CPU cannot be measured locally: both are read from Workers Logs.
+- **Discovery runs first in every batch**: two GitHub requests and two D1 statements per installation.
+  Past about 14 installations it spends the whole request budget and no repo is scanned.
 - **Credentials come from the environment**: wrangler reads `CLOUDFLARE_API_TOKEN` and
   `CLOUDFLARE_ACCOUNT_ID`. There is no `wrangler login`.
 - **The GitHub App's secrets are set on the Worker** with `wrangler secret put`
@@ -105,7 +108,7 @@ placeholder). [`docs/deploying.md`](docs/deploying.md) has the deploy steps.
   public vars.
 - **Cloudflare owns the custom domain's DNS record and certificate.** Never add a record for the
   hostname by hand: the next deploy then fails with "hostname already has a DNS record". If it does,
-  remove only the record Cloudflare made for the Worker (a proxied `AAAA 100::`).
+  remove the hand-added record for that hostname and nothing else.
 - **The zone is live.** Change no other record in it; every DNS change there is additive.
 
 A deploy, a new route, a plan or billing change, and an npm publish each wait for the maintainer's yes.

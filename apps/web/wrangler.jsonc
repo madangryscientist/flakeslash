@@ -37,8 +37,8 @@
     "GITHUB_OAUTH_BASE": "https://github.com",
     "GITHUB_API_BASE": "https://api.github.com",
     "GITHUB_APP_ID": "5771126",
-    // One batch's bounds, sized for the free plan (10 ms CPU, 50 subrequests and 50 D1 queries per
-    // invocation). SCAN_REQUEST_BUDGET counts every GitHub request; SCAN_REPOS_PER_BATCH and
+    // One batch's bounds, sized for the free plan (10 ms CPU and 50 subrequests per invocation, a D1
+    // query counting as one and a batch of statements as one query). SCAN_REQUEST_BUDGET counts every GitHub request; SCAN_REPOS_PER_BATCH and
     // SCAN_D1_CAP bound the D1 statements, which the request budget does not: the batch's D1 handle
     // refuses statements past the cap (src/scan/d1-cap.ts, 950 when unset), the scan in progress
     // stops there, and the next batch carries on. Measured in src/scan/hourly-bounds.test.ts at these
@@ -49,7 +49,10 @@
     //   repo with nothing new then one with only logs left, would run 121 uncapped and stops at 45;
     //   a 40-run backfill over 2 repos lands every log in 9 batches, the cap ending 6 of them.
     // At budget 20 and 1 repo a log-reading batch still runs 60 to 76 uncapped, so the cap, not a
-    // smaller budget, is what keeps a batch inside the free plan. CPU is read from Workers Logs.
+    // smaller budget, is what bounds a log-reading batch. GitHub requests and D1 queries share the 50:
+    // a capped batch can pass it, so the live check reads Workers Logs for that and for CPU.
+    // Discovery runs first, two requests and two statements per installation: past about 14
+    // installations it spends the whole budget.
     "SCAN_REQUEST_BUDGET": 30,
     "SCAN_REPOS_PER_BATCH": 2,
     "SCAN_D1_CAP": 45,

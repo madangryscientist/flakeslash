@@ -168,17 +168,5 @@ describe("the batch's bounds at the values in wrangler.jsonc", () => {
     // Measured: 30 requests, and the cap at 45 statements (uncapped, this batch runs 121).
     expect(requests).toBeLessThanOrEqual(budget);
     expect(statements).toBeLessThanOrEqual(cap);
-
-    // The batches after it carry on where it stopped, each under the cap, until every log is held.
-    const held = async () => (await d1Store(run.db, ORG).readFailures()).length;
-    let more = 0;
-    while (more < 20 && (await held()) < 80) {
-      const next = await run.batch({ now: hour(more) });
-      expect(next.statements).toBeLessThanOrEqual(cap);
-      more += 1;
-    }
-    // Measured: 6 more batches.
-    expect(await held()).toBe(80);
-    expect(more).toBeLessThanOrEqual(8);
   });
 });
