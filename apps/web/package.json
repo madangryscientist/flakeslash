@@ -13,7 +13,7 @@
     "typecheck": "tsr generate && tsc --noEmit",
     "test": "bun --bun vitest run",
     "test:e2e": "playwright test",
-    "db:generate": "drizzle-kit generate",
+    "db:generate": "node --preserve-symlinks --preserve-symlinks-main ../../node_modules/.bun/node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "deploy": "bun run build && wrangler deploy",
     "cf-typegen": "wrangler types --strict-vars=false"
