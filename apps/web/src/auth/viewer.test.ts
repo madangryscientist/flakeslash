@@ -91,6 +91,13 @@ describe("the access token", () => {
     expect(await sessionUser(store, cookie, NOW)).toBeNull();
   });
 
+  test("GitHub being down is an error that keeps the session, not a refusal", async () => {
+    const { deps, cookie, store } = await withSession(4 * MINUTE);
+    stubGithub({ "POST /login/oauth/access_token": () => ({ status: 502 }) });
+    await expect(loadViewer(deps, cookie)).rejects.toThrow("unavailable (502)");
+    expect(await sessionUser(store, cookie, NOW)).not.toBeNull();
+  });
+
   test("a refresh token past its expiry ends the session without asking GitHub", async () => {
     const { deps, cookie, store } = await withSession(4 * MINUTE, 0);
     const calls = stubGithub({});

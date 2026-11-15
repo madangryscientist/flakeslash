@@ -9,7 +9,12 @@ import {
   sessionById,
   sessionUser,
 } from "#/db/users.ts";
-import { type GithubConfig, type GithubTokens, refreshTokens } from "./github.ts";
+import {
+  type GithubConfig,
+  type GithubTokens,
+  GrantRefusedError,
+  refreshTokens,
+} from "./github.ts";
 
 /**
  * The signed-in person for one request. It holds their GitHub access token, so it stays on the
@@ -62,8 +67,12 @@ async function refreshed(
   now: Date,
 ): Promise<GithubTokens | null> {
   if (session.tokens.refreshExpiresAt > now) {
+    // Only a refusal ends the session; an outage or a network error throws and keeps it.
     const tokens = await refreshTokens(deps.config(), session.tokens.refreshToken, now).catch(
-      () => null,
+      (error: unknown) => {
+        if (error instanceof GrantRefusedError) return null;
+        throw error;
+      },
     );
     if (tokens) {
       await saveTokens(deps, session.id, tokens);

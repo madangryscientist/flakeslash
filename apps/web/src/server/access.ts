@@ -50,7 +50,8 @@ function once<K, V>(map: Map<K, Promise<V>>, key: K, load: () => Promise<V>): Pr
 }
 
 /**
- * GET as the person; null when GitHub says they cannot see it (404, or 403 for the App). A 401 is
+ * GET as the person; null when GitHub says they cannot see it (404, or a 403 that is not a rate
+ * limit). A 401 is
  * a token GitHub no longer takes (the person revoked the App): the session ends and they sign in.
  */
 async function githubGet(viewer: Viewer, path: string): Promise<unknown> {
@@ -61,7 +62,10 @@ async function githubGet(viewer: Viewer, path: string): Promise<unknown> {
     await endSessionById(viewer.db, viewer.sessionId);
     signedIn(null);
   }
-  if (res.status === 404 || res.status === 403) return null;
+  // A 403 for a spent rate limit is an error to show, not a repo the person cannot see.
+  const limited =
+    res.headers.get("x-ratelimit-remaining") === "0" || res.headers.has("retry-after");
+  if (res.status === 404 || (res.status === 403 && !limited)) return null;
   if (!res.ok) throw new Error(`GitHub ${path} answered ${res.status}`);
   return res.json();
 }

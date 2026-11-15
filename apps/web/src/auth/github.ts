@@ -56,6 +56,14 @@ export function refreshTokens(
   return tokenGrant(cfg, { grant_type: "refresh_token", refresh_token: refreshToken }, now);
 }
 
+/** GitHub refused the grant (a spent or revoked refresh token, a bad code): sign in again. */
+export class GrantRefusedError extends Error {
+  constructor(status: number) {
+    super(`GitHub refused the token grant (${status})`);
+    this.name = "GrantRefusedError";
+  }
+}
+
 async function tokenGrant(
   cfg: GithubConfig,
   grant: Record<string, string>,
@@ -66,10 +74,12 @@ async function tokenGrant(
     headers: { accept: "application/json", "content-type": "application/json" },
     body: JSON.stringify({ client_id: cfg.clientId, client_secret: cfg.clientSecret, ...grant }),
   });
+  // An outage is not a refusal: it throws as itself, and the session is kept.
+  if (res.status >= 500) throw new Error(`GitHub token grant unavailable (${res.status})`);
   // GitHub answers a refused grant with 200 and an `error` field, so the body decides.
   const body: unknown = res.ok ? await res.json() : null;
   const tokens = isRecord(body) ? toTokens(body, now) : null;
-  if (!tokens) throw new Error(`GitHub token grant failed (${res.status})`);
+  if (!tokens) throw new GrantRefusedError(res.status);
   return tokens;
 }
 

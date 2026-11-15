@@ -10,7 +10,7 @@ export const config: GithubConfig = {
   apiBase: "https://api.github.test",
 };
 
-type Answer = { status?: number; body?: unknown };
+type Answer = { status?: number; body?: unknown; headers?: Record<string, string> };
 type Route = (call: { body: unknown; authorization: string | null }) => Answer | Promise<Answer>;
 
 /**
@@ -34,7 +34,7 @@ export function stubGithub(routes: Record<string, Route>) {
     const answer = await handler(call);
     return new Response(JSON.stringify(answer.body ?? {}), {
       status: answer.status ?? 200,
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...answer.headers },
     });
   });
   return calls;
