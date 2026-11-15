@@ -27,8 +27,10 @@
   "secrets": {
     "required": ["GITHUB_APP_CLIENT_SECRET", "TOKEN_KEY", "GITHUB_APP_PRIVATE_KEY"],
   },
-  // The hourly scan (src/scan/hourly.ts): no webhook, each run finds new installations itself.
-  "triggers": { "crons": ["0 * * * *"] },
+  // The hourly scan (src/scan/hourly.ts): no webhook, each run finds new installations itself. The
+  // daily expiry at 03:30 UTC (src/expire/daily.ts) removes detailed rows past 90 days. src/cron.ts
+  // picks the job by the cron string, so a change here changes EXPIRE_CRON there too.
+  "triggers": { "crons": ["0 * * * *", "30 3 * * *"] },
   "vars": {
     "GITHUB_APP_CLIENT_ID": "",
     "GITHUB_OAUTH_BASE": "https://github.com",

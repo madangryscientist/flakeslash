@@ -75,7 +75,7 @@ function compareText(a: string, b: string): number {
 }
 
 /** Seconds from the job's start to its end; 0 when either time is missing or does not parse. */
-function secondsOf(record: JobRecord): number {
+export function secondsOf(record: JobRecord): number {
   if (record.startedAt === null || record.completedAt === null) return 0;
   const seconds = (Date.parse(record.completedAt) - Date.parse(record.startedAt)) / 1000;
   return Number.isFinite(seconds) ? Math.max(0, seconds) : 0;

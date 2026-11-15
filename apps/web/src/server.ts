@@ -1,5 +1,5 @@
 import handler from "@tanstack/react-start/server-entry";
-import { scheduled } from "#/scan/hourly.ts";
+import { onCron } from "#/cron.ts";
 import { startRefusal } from "#/server/env.ts";
 
 // A production build pointed at the e2e GitHub stand-in does not start: the throw fails the
@@ -7,9 +7,9 @@ import { startRefusal } from "#/server/env.ts";
 const refused = startRefusal();
 if (refused) throw new Error(refused);
 
-/** The Worker's entry: TanStack Start's `fetch`, and the hourly scan on the cron. */
+/** The Worker's entry: TanStack Start's `fetch`, and the hourly scan and the daily expiry on their crons. */
 export default {
   fetch: (request: Request): Response | Promise<Response> => handler.fetch(request),
-  scheduled: (_controller: ScheduledController, env: Env, ctx: ExecutionContext): void =>
-    ctx.waitUntil(scheduled(env)),
+  scheduled: (controller: ScheduledController, env: Env, ctx: ExecutionContext): void =>
+    ctx.waitUntil(onCron(controller.cron, env)),
 };

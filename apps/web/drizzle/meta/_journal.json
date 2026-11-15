@@ -29,6 +29,13 @@
       "when": 1794744362391,
       "tag": "0003_swift_genesis",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1794748581974,
+      "tag": "0004_first_maestro",
+      "breakpoints": true
     }
   ]
 }
