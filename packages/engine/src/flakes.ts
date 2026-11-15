@@ -85,12 +85,24 @@ export function outcomeOf(record: JobRecord): FlakeEvidence["outcome"] | null {
   return null;
 }
 
+/** The key a follow-on set holds (`follow-on.ts`): the lower case repo and the job id, as the store keys a job. */
+export function followOnKey(repo: string, jobId: number): string {
+  return `${repo.toLowerCase()}:${jobId}`;
+}
+
 function keyOf(record: JobRecord): string {
   return JSON.stringify([record.repo, record.workflow, record.jobName, record.commit]);
 }
 
-/** Every job that both failed and passed on one commit, in the order each first appears in the input. */
-export function findJobFlakes(records: JobRecord[]): JobFlake[] {
+/**
+ * Every job that both failed and passed on one commit, in the order each first appears in the input. A
+ * record in `followOn` (by `followOnKey`) failed because another job did, so it counts as neither a
+ * failure nor a pass, as a record `outcomeOf` gives null does.
+ */
+export function findJobFlakes(
+  records: JobRecord[],
+  followOn: ReadonlySet<string> = new Set(),
+): JobFlake[] {
   // A job's place is its first record of any kind, so the order follows the input, not the evidence.
   const jobs = new Map<string, JobFlake>();
 
@@ -110,7 +122,7 @@ export function findJobFlakes(records: JobRecord[]): JobFlake[] {
       jobs.set(key, job);
     }
     const outcome = outcomeOf(record);
-    if (outcome === null) continue;
+    if (outcome === null || followOn.has(followOnKey(record.repo, record.jobId))) continue;
     job.evidence.push({
       outcome,
       url: record.url,

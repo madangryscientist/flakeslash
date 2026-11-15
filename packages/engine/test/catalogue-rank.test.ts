@@ -83,6 +83,15 @@ function rank(records: JobRecord[], failures: Failure[], issues: Issue[], suspec
   return rankIssues({ records, failures, issues, flakes: [], suspects, now: NOW });
 }
 
+/** `rank` with the follow-on jobs given, as `followOnJobs` keys them. */
+function rankWith(
+  { records, failures }: { records: JobRecord[]; failures: Failure[] },
+  issues: Issue[],
+  followOn: Set<string>,
+) {
+  return rankIssues({ records, failures, issues, flakes: [], suspects: [], now: NOW, followOn });
+}
+
 describe("rankIssues", () => {
   it("ranks the issue with more commits first", () => {
     const many = failedOn(3, "many");
@@ -217,5 +226,27 @@ describe("rankIssues", () => {
       const record = job();
       expect(latestFailureOf([failureOf(record, "it")], null)).toBeNull();
     });
+  });
+
+  it("does not rank an issue whose only failures are follow-ons", () => {
+    const gather = failedOn(2, "gather");
+    const ranked = rankWith(
+      gather,
+      [issue("gather")],
+      new Set(gather.records.map((record) => `acme/app:${record.jobId}`)),
+    );
+
+    expect(ranked).toEqual([]);
+  });
+
+  it("ranks an issue on its counted failures only when one is a follow-on", () => {
+    const mixed = failedOn(2, "mixed");
+    const [followed] = mixed.records;
+    const ranked = rankWith(mixed, [issue("mixed")], new Set([`acme/app:${followed?.jobId}`]));
+
+    expect(ranked.map((entry) => [entry.issue.id, entry.commits, entry.secondsLost])).toEqual([
+      ["mixed", 1, 300],
+    ]);
+    expect(rank(mixed.records, mixed.failures, [issue("mixed")])[0]?.commits).toBe(2);
   });
 });

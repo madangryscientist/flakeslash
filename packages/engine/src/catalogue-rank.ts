@@ -4,7 +4,7 @@
  * I/O, and the input is not changed. The window and the flake rule are the ones `rate.ts` uses.
  */
 import type { Failure, Issue } from "./catalogue.ts";
-import { outcomeOf, type JobFlake } from "./flakes.ts";
+import { followOnKey, outcomeOf, type JobFlake } from "./flakes.ts";
 import type { JobRecord } from "./providers/github-actions.ts";
 import { inWindow, windowOf } from "./rate.ts";
 import type { Suspect } from "./suspects.ts";
@@ -41,6 +41,11 @@ export interface RankInput {
   flakes: JobFlake[];
   suspects: Suspect[];
   now: string;
+  /**
+   * The jobs that failed only because another job did (`followOnJobs`), by `followOnKey`. Their failures
+   * do not count. Empty when absent.
+   */
+  followOn?: ReadonlySet<string>;
 }
 
 /** What every issue's rank reads, built once per call. */
@@ -106,8 +111,8 @@ function ranByJob(records: JobRecord[], startMs: number, nowMs: number): Map<str
 }
 
 /**
- * The failures that count, by issue: each failure whose job is in the window and failed. Also every
- * failure's page by issue, counted or not, for the suspect link.
+ * The failures that count, by issue: each failure whose job is in the window and failed, and is not a
+ * follow-on. Also every failure's page by issue, counted or not, for the suspect link.
  */
 function indexFailures(
   input: RankInput,
@@ -124,6 +129,7 @@ function indexFailures(
     const record = recordByUrl.get(failure.url);
     if (record === undefined || outcomeOf(record) !== "failed") continue;
     if (!inWindow(record, startMs, nowMs)) continue;
+    if (input.followOn?.has(followOnKey(record.repo, record.jobId)) === true) continue;
     counted.set(failure.issueId, [...(counted.get(failure.issueId) ?? []), { record, failure }]);
   }
   return { counted, allUrls };

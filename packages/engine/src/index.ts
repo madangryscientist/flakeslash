@@ -31,6 +31,8 @@ export {
   type TestFlake,
 } from "./flakes.ts";
 
+export { followOnJobs } from "./follow-on.ts";
+
 export { flakeRates, type FlakeRate } from "./rate.ts";
 
 export { findSuspects, type Compare, type Suspect } from "./suspects.ts";
