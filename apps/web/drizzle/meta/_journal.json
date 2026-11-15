@@ -15,6 +15,13 @@
       "when": 1794735598459,
       "tag": "0001_complex_steel_serpent",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1794737331962,
+      "tag": "0002_married_maginty",
+      "breakpoints": true
     }
   ]
 }
