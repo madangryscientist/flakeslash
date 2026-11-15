@@ -14,6 +14,9 @@ tasks:
     options:
       runFromWorkspaceRoot: true
   lint:
-    script: "oxlint --type-aware --deny-warnings scripts && bun scripts/check-slop.ts scripts"
+    script: "oxlint --type-aware --deny-warnings scripts && bun scripts/check-slop.ts scripts && bun scripts/personas.ts --check"
+    inputs:
+      - "**/*"
+      - "/docs/personas/**/*"
     options:
       runFromWorkspaceRoot: true

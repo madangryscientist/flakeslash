@@ -24,7 +24,7 @@ runs on the system toolchain, so moon never downloads Bun or runs `bun install`.
 | `engine` | `packages/engine` | flake detection |
 | `cli` | `packages/cli` | the `flakeslash` bin: argv, stdout and exit codes, over `@hackcove/flakeslash-engine` |
 | `web` | `apps/web` | the dashboard: TanStack Start on Cloudflare Workers, D1 via Drizzle |
-| `scripts` | `scripts` | `check-slop.ts`, `test-tmp-scope.ts` (typecheck + lint only) |
+| `scripts` | `scripts` | `check-slop.ts`, `test-tmp-scope.ts`, `personas.ts` (typecheck + lint only) |
 
 `bunfig.toml` sets `[install] linker = "isolated"` and `globalStore = true`: a package sees its own declared dependencies and
 the root's, not another package's. Declare what a package imports in that package's `package.json`.
