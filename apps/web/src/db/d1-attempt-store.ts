@@ -1,5 +1,5 @@
 /** The attempt methods of `d1Store`: every attempt the reader finished, jobs or none. */
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, exists, sql } from "drizzle-orm";
 import type { Store } from "@hackcove/flakeslash-engine";
 import { upsertAll, type Scope } from "./d1-store-shared.ts";
 import { attempts, jobs } from "./schema.ts";
@@ -34,12 +34,30 @@ export function attemptMethods(
       }));
     },
     async heldAttempts(repo) {
-      // An attempt with jobs is held when none is unfinished; one read with no jobs has no jobs row,
-      // so it is held by its attempts row.
+      // An attempt with jobs is held when none is unfinished and its attempts row is written (a write
+      // stopped between the two leaves jobs alone); one read with no jobs is held by its attempts row.
       const finished = q
         .select({ runId: jobs.runId, runAttempt: jobs.runAttempt })
         .from(jobs)
-        .where(and(eq(jobs.orgId, orgId), eq(jobs.repo, repo)))
+        .where(
+          and(
+            eq(jobs.orgId, orgId),
+            eq(jobs.repo, repo),
+            exists(
+              q
+                .select({ one: sql`1` })
+                .from(attempts)
+                .where(
+                  and(
+                    eq(attempts.orgId, jobs.orgId),
+                    eq(attempts.repo, jobs.repo),
+                    eq(attempts.runId, jobs.runId),
+                    eq(attempts.runAttempt, jobs.runAttempt),
+                  ),
+                ),
+            ),
+          ),
+        )
         .groupBy(jobs.runId, jobs.runAttempt)
         .having(sql`SUM(${jobs.conclusion} IS NULL) = 0`);
       const empty = q

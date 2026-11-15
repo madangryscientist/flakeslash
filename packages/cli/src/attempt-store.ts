@@ -55,9 +55,12 @@ export function attemptStore(
     `SELECT repo, run_id, run_attempt, conclusion, created_at, latest_attempt, job_count
      FROM attempts WHERE repo = ? ORDER BY run_id, run_attempt`,
   );
-  // An attempt read with no jobs has no jobs row, so it is held by its attempts row.
+  // An attempt with jobs is held when none is unfinished and its attempts row is written (a write
+  // stopped between the two leaves jobs alone); one read with no jobs is held by its attempts row.
   const heldRows = db.query<{ run_id: number; run_attempt: number }, [string, string]>(
     `SELECT run_id, run_attempt FROM jobs WHERE repo = ?
+       AND EXISTS (SELECT 1 FROM attempts a WHERE a.repo = jobs.repo
+         AND a.run_id = jobs.run_id AND a.run_attempt = jobs.run_attempt)
      GROUP BY run_id, run_attempt
      HAVING SUM(conclusion IS NULL) = 0
      UNION

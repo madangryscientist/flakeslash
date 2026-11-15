@@ -49,6 +49,7 @@ describe("the D1 store: jobs", () => {
 
   it("holds an attempt written with its jobs finished", async () => {
     await store.writeJobs([job({ runId: 10, runAttempt: 1 })]);
+    await store.writeAttempts([attempt(10, 1)]);
 
     expect(await store.heldAttempts(REPO)).toEqual([{ runId: 10, runAttempt: 1 }]);
   });
@@ -58,12 +59,14 @@ describe("the D1 store: jobs", () => {
       job({ runId: 10, runAttempt: 1 }),
       job({ runId: 10, runAttempt: 2, conclusion: null, completedAt: null }),
     ]);
+    await store.writeAttempts([attempt(10, 1), { ...attempt(10, 1), runAttempt: 2 }]);
 
     expect(await store.heldAttempts(REPO)).toEqual([{ runId: 10, runAttempt: 1 }]);
   });
 
   it("does not hold an attempt with a job whose conclusion is null, and holds it once written finished", async () => {
     await store.writeJobs([job({ conclusion: null, completedAt: null })]);
+    await store.writeAttempts([attempt(10, 1)]);
     expect(await store.heldAttempts(REPO)).toEqual([]);
 
     await store.writeJobs([job({ conclusion: "success" })]);
@@ -73,6 +76,7 @@ describe("the D1 store: jobs", () => {
 
   it("does not return another repo's rows", async () => {
     await store.writeJobs([job({ runId: 10 }), job({ repo: OTHER, runId: 20 })]);
+    await store.writeAttempts([attempt(10, 1), { ...attempt(20, 1), repo: OTHER }]);
 
     expect(await store.heldAttempts(REPO)).toEqual([{ runId: 10, runAttempt: 1 }]);
     expect(await store.readJobs(REPO)).toEqual([job({ runId: 10 })]);

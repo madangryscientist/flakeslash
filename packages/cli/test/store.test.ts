@@ -33,6 +33,17 @@ function job(overrides: Partial<JobRecord> = {}): JobRecord {
   };
 }
 
+/** The attempts row a scan writes beside an attempt's jobs: an attempt is held only with it. */
+const attempt = (runId: number, jobCount: number) => ({
+  repo: REPO,
+  runId,
+  runAttempt: 1,
+  conclusion: "success",
+  createdAt: "2026-11-05T10:00:00Z",
+  latestAttempt: 1,
+  jobCount,
+});
+
 const issue = (id: string): Issue => ({
   id,
   name: id,
@@ -75,6 +86,7 @@ describe("the SQLite store", () => {
 
   it("holds an attempt written with its jobs finished", async () => {
     await store.writeJobs([job({ runId: 10, runAttempt: 1 })]);
+    await store.writeAttempts([attempt(10, 1)]);
 
     expect(await store.heldAttempts(REPO)).toEqual([{ runId: 10, runAttempt: 1 }]);
   });
@@ -84,12 +96,14 @@ describe("the SQLite store", () => {
       job({ runId: 10, runAttempt: 1 }),
       job({ runId: 10, runAttempt: 2, conclusion: null, completedAt: null }),
     ]);
+    await store.writeAttempts([attempt(10, 1), { ...attempt(10, 1), runAttempt: 2 }]);
 
     expect(await store.heldAttempts(REPO)).toEqual([{ runId: 10, runAttempt: 1 }]);
   });
 
   it("does not hold an attempt with a job whose conclusion is null, and holds it once written finished", async () => {
     await store.writeJobs([job({ conclusion: null, completedAt: null })]);
+    await store.writeAttempts([attempt(10, 1)]);
     expect(await store.heldAttempts(REPO)).toEqual([]);
 
     await store.writeJobs([job({ conclusion: "success" })]);
@@ -99,6 +113,7 @@ describe("the SQLite store", () => {
 
   it("does not return another repo's rows", async () => {
     await store.writeJobs([job({ runId: 10 }), job({ repo: OTHER, runId: 20 })]);
+    await store.writeAttempts([attempt(10, 1), { ...attempt(20, 1), repo: OTHER }]);
 
     expect(await store.heldAttempts(REPO)).toEqual([{ runId: 10, runAttempt: 1 }]);
     expect(await store.readJobs(REPO)).toEqual([job({ runId: 10 })]);
