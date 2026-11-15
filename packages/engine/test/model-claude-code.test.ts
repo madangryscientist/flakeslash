@@ -102,6 +102,14 @@ describe("createClaudeCodeClient", () => {
     ["a non-zero exit", { code: 1, stdout: "", stderr: "something broke", timedOut: false }],
     ["a timeout", { code: null, stdout: "", stderr: "", timedOut: true }],
     ["bad JSON", { code: 0, stdout: "not json {", stderr: "", timedOut: false }],
+    [
+      "a refused call that names no limit",
+      { code: 1, stdout: "", stderr: "overloaded", timedOut: false },
+    ],
+    [
+      "a refused call where a sentence ends before the word limit",
+      { code: 1, stdout: "", stderr: "you hit your quota. Raise the limit", timedOut: false },
+    ],
   ])("returns failed for %s, and the next call still goes out", async (_name, out) => {
     const { run, seen } = fake([out, ok({ result: "fine" })]);
     const c = client(run);
@@ -138,6 +146,25 @@ describe("createClaudeCodeClient", () => {
         code: 1,
         stdout: JSON.stringify({ is_error: true, result: "Claude usage limit reached" }),
         stderr: "warning: an update is available",
+      },
+    ],
+    [
+      "the 5-hour limit in the result",
+      {
+        code: 0,
+        stdout: JSON.stringify({
+          is_error: true,
+          result: "You've hit your 5-hour limit · resets 5:40am (Africa/Johannesburg)",
+        }),
+        stderr: "",
+      },
+    ],
+    [
+      "the 5-hour limit on stderr",
+      {
+        code: 1,
+        stdout: "",
+        stderr: "You've hit your 5-hour limit · resets 5:40am (Africa/Johannesburg)",
       },
     ],
   ])("returns stopped for %s and refuses the next call without running claude", async (_n, out) => {

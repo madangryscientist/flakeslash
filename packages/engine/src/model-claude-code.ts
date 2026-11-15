@@ -24,7 +24,7 @@ export interface ClaudeCodeClientOptions {
 
 const ERROR_CHARS = 200;
 /** A sign-in or an allowance that is gone: the next call would fail the same way. */
-const STOPPING = /not logged in|please log in|usage limit|rate limit/i;
+const STOPPING = /not logged in|please log in|usage limit|rate limit|hit your [^.]*limit/i;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
