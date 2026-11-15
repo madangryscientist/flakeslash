@@ -29,7 +29,7 @@ export async function runBatch(db: BatchDb, statements: Statement[]): Promise<vo
 }
 
 /** Splits `rows` so that no chunk binds more than `MAX_PARAMS` values in a table of this width. */
-function chunks<T>(rows: T[], table: SQLiteTable): T[][] {
+export function chunks<T>(rows: T[], table: SQLiteTable): T[][] {
   const size = Math.floor(MAX_PARAMS / Object.keys(getTableColumns(table)).length);
   const out: T[][] = [];
   for (let at = 0; at < rows.length; at += size) out.push(rows.slice(at, at + size));

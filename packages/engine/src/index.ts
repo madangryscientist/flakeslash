@@ -25,7 +25,9 @@ export {
 export {
   findJobFlakes,
   nameFlakeTests,
+  outcomeOf,
   type Flake,
+  type FlakeEvidence,
   type FlakeTest,
   type JobFlake,
   type TestFlake,
@@ -98,4 +100,10 @@ export {
   type IssueSummary,
 } from "./issues.ts";
 
-export { flakeRanking, rankIssues, type RankedIssue, type RankInput } from "./catalogue-rank.ts";
+export {
+  flakeRanking,
+  rankIssues,
+  secondsOf,
+  type RankedIssue,
+  type RankInput,
+} from "./catalogue-rank.ts";

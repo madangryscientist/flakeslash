@@ -78,6 +78,22 @@ hits three repos is one issue.
   explanations.
 - A scan stays on the machine unless `--upload` is passed, and then goes only to the server named.
 - Detailed rows last 90 days. Flake records and daily totals last indefinitely.
+  - The detailed rows are a run's attempts and jobs, and their failures, log excerpts and model
+    calls. A compare goes once neither of its commits is on a job still held. The issues are the
+    catalogue and are never removed.
+  - The expiry runs daily at 03:30 UTC. A run is removed by the first daily run after its creation
+    falls before UTC midnight 90 days back. The hourly scan reads only the last 90 days, so a removed
+    run is never read again.
+  - Before its rows go, each proven job flake with evidence in an expiring run gets a **flake
+    record**: the repo, workflow, job and commit, the day of its earliest failed run, links to its
+    earliest failed and earliest passed jobs, the issues of its failures, and the failed job's
+    provider and runner. It is written while both of its runs are still held, whichever expires first.
+  - Each repo's expiring day gets its **daily totals**, one row per provider and runner: jobs, jobs
+    on a run's first attempt and how many of those passed, failed jobs, flake records of that day,
+    and the seconds the jobs ran. No new run can arrive for a day that old, so a day's totals are
+    written once and are final. For a new installation whose first scan never reached its oldest
+    days, those days' totals cover only what was read.
+  - Smoke rows are removed like the rest and count in no total or record.
 
 ## What people see
 

@@ -212,3 +212,61 @@ export const sessions = sqliteTable(
   },
   (t) => [index("sessions_by_user").on(t.userId)],
 );
+
+// The kept tables. The detailed rows above (jobs, attempts, excerpts, compares, failures, model calls)
+// expire 90 days after their run (`src/expire/expire.ts`); these are written from them first and stay.
+
+/**
+ * One proven job flake: a job (repo, workflow and job name) that both failed and passed on one commit.
+ * Written when the first run of its evidence expires, while both its runs are still held.
+ */
+export const flakeRecords = sqliteTable(
+  "flake_records",
+  {
+    orgId: orgId(),
+    repo: text("repo").notNull(),
+    workflow: text("workflow").notNull(),
+    jobName: text("job_name").notNull(),
+    commitSha: text("commit_sha").notNull(),
+    /** `YYYY-MM-DD` (UTC): the day of the run of its earliest failed evidence. */
+    day: text("day").notNull(),
+    /** The job page of the earliest failed evidence. */
+    failedUrl: text("failed_url").notNull(),
+    /** The job page of the earliest passed evidence. */
+    passedUrl: text("passed_url").notNull(),
+    /** JSON: the sorted ids of the issues of the failed jobs' failures. */
+    issueIds: text("issue_ids").notNull(),
+    /** The earliest failed job's. */
+    provider: text("provider").notNull(),
+    runner: text("runner").notNull(),
+    isSmoke: isSmoke(),
+  },
+  (t) => [primaryKey({ columns: [t.orgId, t.repo, t.workflow, t.jobName, t.commitSha] })],
+);
+
+/**
+ * One repo's jobs on one day (`YYYY-MM-DD`, UTC, the day of the run's `created_at`) on one provider and
+ * runner kind. Written once, whole, when the day's runs expire: by then no new run can arrive for it.
+ */
+export const dailyTotals = sqliteTable(
+  "daily_totals",
+  {
+    orgId: orgId(),
+    repo: text("repo").notNull(),
+    day: text("day").notNull(),
+    provider: text("provider").notNull(),
+    runner: text("runner").notNull(),
+    jobs: integer("jobs").notNull(),
+    /** Jobs on a run's first attempt. */
+    firstAttemptJobs: integer("first_attempt_jobs").notNull(),
+    /** Of those, the ones that passed. */
+    firstAttemptPassed: integer("first_attempt_passed").notNull(),
+    failedJobs: integer("failed_jobs").notNull(),
+    /** The `flake_records` rows of this repo, day, provider and runner. */
+    flakes: integer("flakes").notNull(),
+    /** Each job's whole seconds from start to end (0 with a time missing), summed. */
+    seconds: integer("seconds").notNull(),
+    isSmoke: isSmoke(),
+  },
+  (t) => [primaryKey({ columns: [t.orgId, t.repo, t.day, t.provider, t.runner] })],
+);
