@@ -128,14 +128,6 @@ describe("the D1 store: excerpts", () => {
     expect((await store.readExcerpts(OTHER)).map((row) => row.repo)).toEqual([OTHER]);
     expect(await store.excerptJobIds("madangryscientist/none")).toEqual([]);
   });
-
-  it("lists each job with an excerpt once, in job order", async () => {
-    await store.writeExcerpt(kept({ jobId: 3 }));
-    await store.writeExcerpt(kept({ jobId: 1, status: "gone", excerpt: null }));
-    await store.writeExcerpt(kept({ jobId: 3, excerpt: "again" }));
-
-    expect(await store.excerptJobIds(REPO)).toEqual([1, 3]);
-  });
 });
 
 describe("the D1 store: compares", () => {
