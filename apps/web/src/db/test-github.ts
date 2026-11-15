@@ -35,7 +35,7 @@ export function playwrightLog(...tests: [string, string][]): string {
 }
 
 /** One run of `repo` with one failed job (its `CI / Gate`) whose log is `log`. */
-export function failedRun(
+function failedRun(
   repo: string,
   runId: number,
   log: Reply,
