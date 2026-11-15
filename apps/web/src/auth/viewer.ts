@@ -28,7 +28,12 @@ export type Viewer = {
   accessToken: string;
 };
 
-export type ViewerDeps = SessionStore & { config: () => GithubConfig; now?: Date };
+export type ViewerDeps = SessionStore & {
+  config: () => GithubConfig;
+  now?: Date;
+  /** Waits between re-reads of a session whose refresh was refused; a real timer by default. */
+  wait?: (ms: number) => Promise<void>;
+};
 
 /** An access token this close to its expiry is refreshed before it is used. */
 const REFRESH_MARGIN_MS = 5 * 60 * 1000;
@@ -57,8 +62,17 @@ export async function loadViewer(
   };
 }
 
-/** How long a refused refresh waits for a racing request to write its tokens back. */
-const RACE_WAIT_MS = 500;
+/**
+ * A refused refresh re-reads the session this often, and this many times after the first read,
+ * for a racing request to write its tokens back: 3 seconds in all.
+ */
+const RACE_POLL_MS = 50;
+const RACE_POLLS = 60;
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 
 /** The session's refreshed tokens, written back; a refused refresh ends the session (null). */
 async function refreshed(
@@ -80,11 +94,12 @@ async function refreshed(
     }
     // GitHub rotates the refresh token, so a request that raced this one and refreshed first has
     // spent ours. Its tokens are in the row, or about to be: use them rather than sign out.
-    const winner =
-      (await rotated(deps, session, now)) ??
-      (await new Promise((resolve) => setTimeout(resolve, RACE_WAIT_MS)).then(() =>
-        rotated(deps, session, now),
-      ));
+    const wait = deps.wait ?? sleep;
+    let winner = await rotated(deps, session, now);
+    for (let poll = 0; !winner && poll < RACE_POLLS; poll += 1) {
+      await wait(RACE_POLL_MS);
+      winner = await rotated(deps, session, now);
+    }
     if (winner) return winner;
   }
   await endSessionById(deps.db, session.id);
