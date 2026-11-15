@@ -18,11 +18,15 @@ import {
   at,
   batch,
   catalogue,
+  fail,
   history,
   installation,
+  ONE,
   stubGitHub,
   tokenPath,
 } from "./test-app.ts";
+import { flakyRoutesOf } from "#/db/test-github.ts";
+import { d1Store } from "#/db/d1-store.ts";
 
 describe("the hourly scan: installations it skips", () => {
   it("skips a suspended installation", async () => {
@@ -133,6 +137,39 @@ describe("scheduled", () => {
     const held = await q.select({ name: repos.name }).from(repos).where(eq(repos.orgId, 909));
     expect(held).toHaveLength(45);
     expect(lines.at(-1)).toMatch(/stopped: budget$/);
+  });
+
+  it("fetches a run again when the cap fell between its jobs and its attempts row", async () => {
+    const gh = stubGitHub(
+      {
+        ...appRoutes([installation(7, ACME, "Acme")]),
+        ...flakyRoutesOf([[ONE, 1, fail("x")]], []),
+      },
+      { 7: ["Acme/One"] },
+    );
+    let capAttempts = true;
+    const db = testDb({
+      onStatement: (sql) => {
+        if (capAttempts && /insert into "attempts"/i.test(sql)) throw new D1CapReached(45);
+      },
+    });
+    const lines: string[] = [];
+    const log = (line: string) => lines.push(line);
+    await scheduled(env(), { db, fetch: gh.fetch, now: at(0), log });
+
+    // The cap is an expected stop, not a failed scan.
+    expect(lines.at(-1)).toMatch(/stopped: d1-cap$/);
+    expect(lines.some((line) => line.includes("failed"))).toBe(false);
+    const store = d1Store(db, ACME);
+    expect(await store.readJobs(ONE)).toHaveLength(1);
+    expect(await store.readAttempts(ONE)).toEqual([]);
+
+    capAttempts = false;
+    await scheduled(env(), { db, fetch: gh.fetch, now: at(1), log });
+    expect(await store.readJobs(ONE)).toHaveLength(1);
+    expect(await store.readAttempts(ONE)).toEqual([
+      expect.objectContaining({ runId: 1, runAttempt: 1, jobCount: 1 }),
+    ]);
   });
 
   it("refuses D1 statements past the batch's cap, batched or not", async () => {

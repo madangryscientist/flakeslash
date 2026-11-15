@@ -16,7 +16,7 @@ import {
   shaOf,
 } from "../../engine/test/github-fake.ts";
 import { openSqliteStore } from "../src/store.ts";
-import { SINCE, useScan } from "./scan-harness.ts";
+import { SINCE, jobRecord, useScan } from "./scan-harness.ts";
 
 const CREATED = "2026-11-04T00:00:00Z";
 const jobsRequests = (paths: string[]) => paths.filter((path) => path.includes("/jobs?"));
@@ -282,10 +282,41 @@ describe("flakeslash scan: runs that list no jobs", () => {
     gh.paths.length = 0;
     const out = await scan.exec(["scan", REPO, "--since", SINCE, "--json"], gh);
     expect(out.code).toBe(0);
-    // The jobs are held, so only the attempt with no jobs is fetched again.
-    expect(jobsRequests(gh.paths)).toEqual([jobsPath(2, 1)]);
+    // An attempt is held only with its attempts row, and the dropped table took every one, so both are
+    // fetched again: run 1's jobs are written once more (the same row) and both attempt rows come back.
+    expect(jobsRequests(gh.paths)).toEqual([jobsPath(1, 1), jobsPath(2, 1)]);
     expect(JSON.parse(out.out).repos[0].coverage).toMatchObject({ read: 2, noJobs: 1 });
     expect(await scan.rows()).toHaveLength(1);
+
+    gh.paths.length = 0;
+    await scan.exec(["scan", REPO, "--since", SINCE], gh);
+    expect(jobsRequests(gh.paths)).toEqual([]);
+  });
+
+  it("fetches again a run whose jobs were written without its attempts row, and writes the row", async () => {
+    // A write stopped between a run's jobs and its attempt row leaves the jobs alone.
+    const store = openSqliteStore(scan.storePath(), { durable: false });
+    try {
+      await store.writeJobs([jobRecord(1, 10)]);
+    } finally {
+      store.close();
+    }
+
+    const gh = fakeGitHub(repoOf(jobRun(1)));
+    expect((await scan.exec(["scan", REPO, "--since", SINCE], gh)).code).toBe(0);
+    expect(jobsRequests(gh.paths)).toEqual([jobsPath(1, 1)]);
+    expect(await scan.rows()).toEqual([expect.objectContaining({ jobId: 10, runId: 1 })]);
+    expect(await scan.attempts()).toEqual([expect.objectContaining({ runId: 1, jobCount: 1 })]);
+  });
+
+  it("does not fetch again a finished run whose attempts row is written", async () => {
+    const gh = fakeGitHub(repoOf(jobRun(1)));
+    await scan.exec(["scan", REPO, "--since", SINCE], gh);
+    expect(await scan.attempts()).toEqual([expect.objectContaining({ runId: 1, jobCount: 1 })]);
+
+    gh.paths.length = 0;
+    expect((await scan.exec(["scan", REPO, "--since", SINCE], gh)).code).toBe(0);
+    expect(gh.paths).toEqual([runsPath()]);
   });
 
   it("never returns an attempts row from readJobs", async () => {

@@ -1,7 +1,19 @@
 import { scanRepo, type Store } from "@hackcove/flakeslash-engine";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { fakeGitHub, since } from "../../../../packages/engine/test/github-fake.ts";
+import {
+  fakeGitHub,
+  job as apiJob,
+  jobsOf,
+  jobsPath,
+  json,
+  pullsPath,
+  run,
+  runsOf,
+  runsPath,
+  shaOf,
+  since,
+} from "../../../../packages/engine/test/github-fake.ts";
 import { d1Store, type BatchDb } from "./d1-store.ts";
 import type { Db } from "./db.ts";
 import { failures as failureRows, jobs as jobRows } from "./schema.ts";
@@ -97,5 +109,41 @@ describe("the D1 store under scanRepo", () => {
     expect(await store.readJobs(REPO)).toHaveLength(2);
     expect(await store.readExcerpts(REPO)).toHaveLength(1);
     expect(await store.readFailures()).toEqual(failures);
+  });
+});
+
+/** One repo with one passing run, its one job finished. */
+const passingRun = () =>
+  fakeGitHub({
+    [runsPath()]: runsOf(run(1, "2026-11-04T00:00:00Z")),
+    [pullsPath(shaOf(1))]: json([]),
+    [jobsPath(1, 1)]: jobsOf(apiJob(10, 1)),
+  });
+const jobsRequests = (paths: string[]) => paths.filter((path) => path.includes("/jobs?"));
+
+describe("the D1 store: a run's jobs written without its attempts row", () => {
+  it("fetches that attempt again on the next scan and leaves its jobs and its attempts row", async () => {
+    // A write stopped between the two leaves the jobs alone.
+    await store.writeJobs([job({ jobId: 10, runId: 1, jobName: "Gate", commit: shaOf(1) })]);
+    expect(await store.heldAttempts(REPO)).toEqual([]);
+
+    const gh = passingRun();
+    await scanRepo({ repo: REPO, since, fetch: gh.fetch, store });
+    expect(jobsRequests(gh.paths)).toEqual([jobsPath(1, 1)]);
+    expect(await store.readJobs(REPO)).toEqual([expect.objectContaining({ jobId: 10, runId: 1 })]);
+    expect(await store.readAttempts(REPO)).toEqual([
+      expect.objectContaining({ runId: 1, runAttempt: 1, jobCount: 1 }),
+    ]);
+    expect(await store.heldAttempts(REPO)).toEqual([{ runId: 1, runAttempt: 1 }]);
+  });
+
+  it("does not fetch again a finished run whose attempts row is written", async () => {
+    const gh = passingRun();
+    await scanRepo({ repo: REPO, since, fetch: gh.fetch, store });
+    expect(await store.readAttempts(REPO)).toHaveLength(1);
+
+    gh.paths.length = 0;
+    await scanRepo({ repo: REPO, since, fetch: gh.fetch, store });
+    expect(gh.paths).toEqual([runsPath()]);
   });
 });

@@ -5,7 +5,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ClaudeRun, FetchLike, ModelFetch } from "@hackcove/flakeslash-engine";
+import type { ClaudeRun, FetchLike, JobRecord, ModelFetch } from "@hackcove/flakeslash-engine";
 import { afterEach, beforeEach, vi } from "vitest";
 import {
   REPO,
@@ -25,6 +25,28 @@ import { run } from "../src/cli.ts";
 import { openSqliteStore } from "../src/store.ts";
 
 export const SINCE = "2026-11-01";
+
+/** The record the scan writes for `job(jobId, runId)` of the GitHub fake: attempt 1, finished. */
+export const jobRecord = (runId: number, jobId: number): JobRecord => ({
+  repo: REPO,
+  workflow: "CI",
+  jobName: "Gate",
+  jobId,
+  url: `https://github.com/${REPO}/actions/runs/${runId}/job/${jobId}`,
+  commit: shaOf(runId),
+  branch: "main",
+  prNumber: null,
+  provider: "github-actions",
+  runner: "github-hosted",
+  runnerName: "GitHub Actions 1",
+  runId,
+  runAttempt: 1,
+  conclusion: "success",
+  startedAt: "2026-11-03T10:00:00Z",
+  completedAt: "2026-11-03T10:01:00Z",
+  steps: [],
+  annotations: [],
+});
 
 export const text = (body: string, status = 200): Response => new Response(body, { status });
 

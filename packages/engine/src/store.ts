@@ -9,7 +9,7 @@ import type { ReadAttempt } from "./providers/github-attempt.ts";
 
 /**
  * One attempt of one run that the store holds in full: every job it lists is finished (no job has a null
- * conclusion), or it was read and listed no jobs at all.
+ * conclusion) and its attempt row is written, or it was read and listed no jobs at all.
  */
 export interface HeldAttempt {
   runId: number;
@@ -53,7 +53,8 @@ export interface Store {
   readAttempts(repo: string): Promise<ReadAttempt[]>;
   /**
    * The attempts of `repo` the store holds in full, as far as its rows show: those with jobs, none of
-   * them unfinished, and those read with no jobs. An attempt with any unfinished job is not held.
+   * them unfinished, whose attempt row is written, and those read with no jobs. An attempt with any
+   * unfinished job, or with jobs and no attempt row (a write stopped between the two), is not held.
    */
   heldAttempts(repo: string): Promise<HeldAttempt[]>;
   /** Every job the store holds for `repo`, as written. */
