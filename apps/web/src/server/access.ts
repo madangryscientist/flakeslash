@@ -1,5 +1,6 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { githubHeaders, isRecord } from "#/auth/github.ts";
+import { nextLink } from "#/github/app.ts";
 import { type Viewer, signedIn } from "#/auth/viewer.ts";
 import { readCompares, readFailures, readIssues, readJobs } from "#/db/catalogue.ts";
 import { compareFromRow, failureFromRow, issueFromRow, jobFromRow } from "#/db/rows.ts";
@@ -81,30 +82,18 @@ async function bodyOf(viewer: Viewer, path: string, res: Response): Promise<unkn
   return res.json();
 }
 
-/** The `rel="next"` URL of a `Link` header, or null. */
-function nextLink(res: Response): string | null {
-  for (const part of (res.headers.get("link") ?? "").split(",")) {
-    const match = /^\s*<([^>]+)>\s*;\s*rel="next"\s*$/.exec(part);
-    if (match?.[1]) return match[1];
-  }
-  return null;
-}
-
 /**
  * Every page of a list GET, following the `Link` header's next URL until there is none. A next URL off
  * the API base is refused: the person's token goes nowhere else.
  */
 async function githubPages(viewer: Viewer, path: string): Promise<unknown[]> {
-  const base = new URL(viewer.apiBase);
+  const base = viewer.apiBase.replace(/\/+$/, "");
   const pages: unknown[] = [];
-  let url: URL | null = new URL(path, base);
-  while (url) {
-    const page = await githubFetch(viewer, url);
+  let url: string | null = `${base}${path}`;
+  while (url !== null) {
+    const page = await githubFetch(viewer, new URL(url));
     pages.push(page.body);
-    const next = nextLink(page.res);
-    url = next === null ? null : new URL(next, base);
-    if (url && url.origin !== base.origin)
-      throw new Error(`GitHub ${path} paged off the API base: ${url.origin}`);
+    url = nextLink(page.res.headers.get("link"), base);
   }
   return pages;
 }
@@ -204,6 +193,9 @@ export async function issuesFor(
   });
 }
 
+/** D1 binds at most 100 values a statement; `real()` takes one of them. */
+const ORG_IDS_PER_QUERY = 90;
+
 /** The ids of the accounts the person reaches an installation of the App on. */
 async function installedAccounts(viewer: Viewer): Promise<number[]> {
   const pages = await githubPages(viewer, "/user/installations?per_page=100");
@@ -222,13 +214,19 @@ async function installedAccounts(viewer: Viewer): Promise<number[]> {
  * GitHub lists for them, sorted by login.
  */
 export async function orgsFor(viewer: Viewer): Promise<Org[]> {
-  const ids = await installedAccounts(viewer);
-  if (ids.length === 0) return [];
-  return viewer.db
-    .select({ id: organisations.id, login: organisations.login, type: organisations.type })
-    .from(organisations)
-    .where(and(inArray(organisations.id, ids), real(organisations.isSmoke)))
-    .orderBy(asc(organisations.login));
+  const ids = [...new Set(await installedAccounts(viewer))];
+  const chunks: number[][] = [];
+  for (let at = 0; at < ids.length; at += ORG_IDS_PER_QUERY)
+    chunks.push(ids.slice(at, at + ORG_IDS_PER_QUERY));
+  const found = await Promise.all(
+    chunks.map((chunk) =>
+      viewer.db
+        .select({ id: organisations.id, login: organisations.login, type: organisations.type })
+        .from(organisations)
+        .where(and(inArray(organisations.id, chunk), real(organisations.isSmoke))),
+    ),
+  );
+  return found.flat().toSorted((a, b) => (a.login < b.login ? -1 : Number(a.login > b.login)));
 }
 
 /**

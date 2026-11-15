@@ -298,7 +298,7 @@ describe("orgsFor", () => {
         headers: { link: '<https://elsewhere.test/user/installations?page=2>; rel="next"' },
       }),
     });
-    await expect(orgsFor(v)).rejects.toThrow("off the API base");
+    await expect(orgsFor(v)).rejects.toThrow("next link off");
   });
 
   test("a token GitHub no longer takes ends the session", async () => {

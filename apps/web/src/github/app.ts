@@ -79,7 +79,7 @@ const NEXT_LINK = /<([^>]+)>\s*;\s*rel="next"/;
  * The `rel="next"` URL of a Link header. One that leaves the API base throws: following it would send
  * the App's credentials elsewhere, and skipping it would end the listing as if it were complete.
  */
-function nextLink(header: string | null, apiBase: string): string | null {
+export function nextLink(header: string | null, apiBase: string): string | null {
   const url = header === null ? undefined : NEXT_LINK.exec(header)?.[1];
   if (url === undefined) return null;
   if (!url.startsWith(`${apiBase}/`)) throw new Error(`GitHub sent a next link off ${apiBase}`);
