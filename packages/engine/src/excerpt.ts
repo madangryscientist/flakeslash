@@ -127,63 +127,37 @@ const FILE_LINE =
 /** The end of a group, where a file header above it stops applying. Moon's prefix is allowed. */
 const GROUP_END_LINE = /^\s*(?:\S+ \| )?(?:##\[endgroup\]|::endgroup::)/;
 
-/** Moon's `<target> | ` prefix, captured: the task that printed the line. */
-const MOON_TARGET = /^\s*(\S+) \| /;
-
 /**
- * Follows, line by line, which file header applies at each point of a step: the latest one, unless
- * a group has ended since. Moon interleaves the lines of tasks run at once, so each target has its
- * own; a line with no prefix applies to every target. One pass, so the cut stays linear.
+ * Moon's `<target> | ` prefix, captured, in the shape the signature reader splits streams by. A line
+ * without it belongs to the job's own stream, keyed `""`.
  */
-class FileLines {
-  /** The header for any target, from every line. */
-  private any: number | undefined;
-  /** The header set by the latest unprefixed line, for targets with no line of their own since. */
-  private shared: number | undefined;
-  private readonly byTarget = new Map<string, number | undefined>();
+const MOON_TARGET = /^\s*([\w@./-]+:[\w.-]+) \|(?: |$)/;
 
-  /** Reads the line at `index`, after the windows that start at it have asked. */
-  read(line: string, index: number): void {
-    let header: number | undefined;
-    if (GROUP_END_LINE.test(line)) header = undefined;
-    else if (FILE_LINE.test(line)) header = index;
-    else return;
-    this.any = header;
-    const target = MOON_TARGET.exec(line)?.[1];
-    if (target === undefined) {
-      this.shared = header;
-      this.byTarget.clear();
-    } else {
-      this.byTarget.set(target, header);
-    }
-  }
-
-  /** The header that applies to `target`'s next line, or to any target's when it is undefined. */
-  for(target: string | undefined): number | undefined {
-    if (target === undefined) return this.any;
-    return this.byTarget.has(target) ? this.byTarget.get(target) : this.shared;
-  }
+function streamOf(line: string): string {
+  return MOON_TARGET.exec(line)?.[1] ?? "";
 }
 
 /**
- * The moon targets of the matches in the window that starts at `index`. A window with no prefixed
- * match gives `[undefined]`, which `FileLines` reads as any target.
+ * Follows, line by line, which file header applies in each stream: the latest one, unless a group
+ * has ended since. Moon interleaves the lines of tasks run at once, so each target is its own stream,
+ * as the signature reader sees it. One pass, so the cut stays linear.
  */
-function windowTargets(step: string[], keep: boolean[], index: number): (string | undefined)[] {
-  const targets = new Set<string>();
+function readFileLine(files: Map<string, number>, line: string, index: number): void {
+  if (GROUP_END_LINE.test(line)) files.delete(streamOf(line));
+  else if (FILE_LINE.test(line)) files.set(streamOf(line), index);
+}
+
+/** The file headers for the streams of the matches in the window starting at `index`, in log order. */
+function windowHeaders(
+  step: string[],
+  keep: boolean[],
+  index: number,
+  files: Map<string, number>,
+): string[] {
+  const headers = new Set<number>();
   for (let i = index; i < step.length && keep[i]; i++) {
     const line = step[i] ?? "";
-    const target = MOON_TARGET.exec(line)?.[1];
-    if (target !== undefined && isMatch(line)) targets.add(target);
-  }
-  return targets.size > 0 ? [...targets] : [undefined];
-}
-
-/** The file headers that apply to the window starting at `index`, one per target, in log order. */
-function windowHeaders(step: string[], keep: boolean[], index: number, files: FileLines): string[] {
-  const headers = new Set<number>();
-  for (const target of windowTargets(step, keep, index)) {
-    const header = files.for(target);
+    const header = isMatch(line) ? files.get(streamOf(line)) : undefined;
     if (header !== undefined) headers.add(header);
   }
   return [...headers].toSorted((a, b) => a - b).map((header) => step[header] ?? "");
@@ -205,7 +179,7 @@ function excerptStep(step: string[]): string[] {
   });
 
   const out: string[] = [];
-  const files = new FileLines();
+  const files = new Map<string, number>();
   let previous = -1;
   step.forEach((line, index) => {
     if (keep[index]) {
@@ -215,7 +189,7 @@ function excerptStep(step: string[]): string[] {
       out.push(line);
       previous = index;
     }
-    files.read(line, index);
+    readFileLine(files, line, index);
   });
   return out;
 }
