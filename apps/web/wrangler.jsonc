@@ -21,11 +21,33 @@
   // Sign-in is the GitHub App's user authorization. GITHUB_APP_CLIENT_SECRET and TOKEN_KEY (base64
   // of 32 random bytes; it seals the GitHub tokens a session keeps) are secrets: `wrangler secret
   // put`, or `.dev.vars` locally). No value of either is in the tree.
-  "secrets": { "required": ["GITHUB_APP_CLIENT_SECRET", "TOKEN_KEY"] },
+  // GITHUB_APP_PRIVATE_KEY is the App's own key, for the hourly scan (a secret too). GITHUB_APP_ID
+  // is empty until the App is registered; with the id or the key empty, the scan logs one line and
+  // calls nothing.
+  "secrets": {
+    "required": ["GITHUB_APP_CLIENT_SECRET", "TOKEN_KEY", "GITHUB_APP_PRIVATE_KEY"],
+  },
+  // The hourly scan (src/scan/hourly.ts): no webhook, each run finds new installations itself.
+  "triggers": { "crons": ["0 * * * *"] },
   "vars": {
     "GITHUB_APP_CLIENT_ID": "",
     "GITHUB_OAUTH_BASE": "https://github.com",
     "GITHUB_API_BASE": "https://api.github.com",
+    "GITHUB_APP_ID": "",
+    // One batch's bounds. SCAN_REQUEST_BUDGET counts every GitHub request; SCAN_REPOS_PER_BATCH
+    // bounds the D1 statements, which the request budget does not. Both keep an invocation under
+    // 1,000 subrequests and 1,000 D1 statements (every statement counted, batched or not), measured
+    // in src/scan/hourly-bounds.test.ts at these values:
+    //   a backfill larger than one batch, every log kept: 200 requests, at most 485 statements;
+    //   20 repos with nothing new: 23 requests, 183 statements;
+    //   the worst mix, 19 repos with nothing new, then new logs of two failed tests each: 200 requests, 891 statements.
+    // 800 and 50 (the first measure) reached 2,400 statements on a batch of log reads, and 300 and
+    // 20 reached 1,008 on the worst mix with one test per log (these values: two tests per log).
+    // A log with more distinct failures writes more (a new issue each), which no request budget
+    // bounds, so the batch's D1 handle also refuses statements past D1_STATEMENT_CAP (950,
+    // src/scan/d1-cap.ts): the scan in progress stops there, and the next batch carries on.
+    "SCAN_REQUEST_BUDGET": 200,
+    "SCAN_REPOS_PER_BATCH": 20,
   },
   // `CLOUDFLARE_ENV=e2e`: the Playwright build. Bindings and vars are not inherited by an env, so they
   // repeat here. The Playwright run's `vite.config.ts` points the GitHub bases at its stand-in
@@ -45,6 +67,9 @@
         "GITHUB_APP_CLIENT_ID": "",
         "GITHUB_OAUTH_BASE": "https://github.com",
         "GITHUB_API_BASE": "https://api.github.com",
+        "GITHUB_APP_ID": "",
+        "SCAN_REQUEST_BUDGET": 200,
+        "SCAN_REPOS_PER_BATCH": 20,
       },
     },
   },

@@ -13,6 +13,18 @@ It is source-available under the Elastic License 2.0 and self-hostable. This fil
   and needs no pipeline change. It reads every run's pass/fail record and the logs of failed jobs
   only. A job is never analysed twice, and a scan stops at its spending cap and reports what it
   covered.
+- **The GitHub App, for the dashboard.** Installing the App is enough. There is no webhook: a scan runs
+  every hour, finds new installations by itself, records their accounts and repos, and scans them. A
+  new failure usually shows up within an hour. That holds while an organisation's repos fit one batch,
+  both in count (`SCAN_REPOS_PER_BATCH`) and in GitHub requests (`SCAN_REQUEST_BUDGET`, which every
+  scan's re-listing of 90 days of runs draws on). Beyond that, repos take turns, the one scanned
+  longest ago first.
+  - A new installation's first scan reads back 90 days, which is how long GitHub keeps Actions logs.
+    A big backfill fills over several hourly batches: each batch stops at its bounds, and the next one
+    carries on from what is already stored.
+  - The App asks for every permission it will need now, so an installed organisation never has to
+    approve it again: Actions read, Contents read (for `CODEOWNERS` and compares), Checks write (for
+    the PR check), Metadata read, and Members read (for sign-in, which an organisation admin approves).
 - **Upload.** `flakeslash upload` is how new data arrives and how a CI system without a reader joins
   in. It takes any log or text file. JUnit XML is welcome and gives exact test names, but it is never
   required.
@@ -51,7 +63,9 @@ hits three repos is one issue.
 - An entry the model writes starts as **potential**. It becomes **confirmed** when pass/fail evidence
   proves a flake or a person confirms it.
 - People can rename, merge, split or dismiss entries. A dismissed entry stays dismissed on a rescan.
-- Issues rank by commits affected in the last 30 days, with CI minutes lost as a second sort.
+- Only flake candidates are ranked: an issue with a job that failed and passed on one commit, or a
+  suspect. Proven flakes come first, then suspects, each by commits affected in the last 30 days with
+  CI minutes lost as a second sort. Other failing issues are counted but not ranked.
 
 ## Data and privacy
 
@@ -70,7 +84,7 @@ hits three repos is one issue.
 - **CLI.** `flakeslash scan` writes a local catalogue and report, for one repo or several.
 - **Dashboard**, hosted or self-hosted, with GitHub sign-in. A person sees the repos they can read on
   GitHub. Uploads use a project token, so a Jenkins job needs no GitHub login.
-  - **Catalogue**, the home page: issues ranked by how much they hurt.
+  - **Catalogue**, the home page: flake candidates ranked by how much they hurt.
   - **Issue page**: a commit-by-commit timeline, affected PRs, tests and jobs, log excerpts and the
     likely cause.
   - **Reliability overview**: first-attempt pass rate and flake trend by team, repo, provider and

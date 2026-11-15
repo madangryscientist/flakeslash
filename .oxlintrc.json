@@ -108,6 +108,12 @@
       "rules": {
         "no-console": "off"
       }
+    },
+    {
+      "files": ["apps/web/src/server/log.ts"],
+      "rules": {
+        "no-console": "off"
+      }
     }
   ],
   "ignorePatterns": ["src/routeTree.gen.ts", "worker-configuration.d.ts", "drizzle/**"]
