@@ -79,4 +79,44 @@ describe("reportHtml", () => {
       expect(dark).toContain(token);
     }
   });
+
+  describe("flake rate text", () => {
+    it("prints <1% for a rate above 0 and under 1%, with the count beside it", () => {
+      expect(rateLine(1 / 348, 1, 348)).toBe("&lt;1% (1 of 348 commits)");
+      expect(rateLine(0.004, 2, 500)).toBe("&lt;1% (2 of 500 commits)");
+      expect(rateLine(0.009, 9, 1000)).toBe("&lt;1% (9 of 1000 commits)");
+    });
+
+    it("prints 0% for a rate of exactly 0", () => {
+      expect(rateLine(0, 0, 573)).toBe("0% (0 of 573 commits)");
+    });
+
+    it("rounds from 1% up as before", () => {
+      expect(rateLine(0.01, 1, 100)).toBe("1% (1 of 100 commits)");
+      expect(rateLine(0.016, 16, 1000)).toBe("2% (16 of 1000 commits)");
+    });
+
+    it("keeps no rate when there is no rate", () => {
+      expect(reportHtml(withRate(null, 0, 0))).toContain("<dd>no rate</dd>");
+    });
+  });
 });
+
+/** The report for the one ranked issue with this rate, with its count. */
+function withRate(rate: number | null, flakyCommits: number, ranCommits: number) {
+  return {
+    ranked: [{ ...ranked, rate, flakyCommits, ranCommits }],
+    excerpts: new Map(),
+    repos: ["acme/app"],
+    coverage: [],
+    now: "2026-12-01T00:00:00.000Z",
+  };
+}
+
+/** The flake rate line the report shows for this rate and count. */
+function rateLine(rate: number, flakyCommits: number, ranCommits: number): string {
+  const match = /<dd>([^<]*commits\))<\/dd>/.exec(
+    reportHtml(withRate(rate, flakyCommits, ranCommits)),
+  );
+  return match?.[1] ?? "";
+}
