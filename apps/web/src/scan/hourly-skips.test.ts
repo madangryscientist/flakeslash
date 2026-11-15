@@ -8,7 +8,7 @@ import { d1Db } from "#/db/test-d1.ts";
 import { testDb } from "#/db/test-db.ts";
 import { drizzle } from "drizzle-orm/d1";
 import * as schema from "#/db/schema.ts";
-import { capStatements } from "./d1-cap.ts";
+import { capStatements, D1CapReached } from "./d1-cap.ts";
 import { scheduled, type ScanEnv } from "./hourly.ts";
 import {
   ACME,
@@ -141,6 +141,32 @@ describe("scheduled", () => {
     await one();
     await capped.batch([one(), one()]);
     await expect(one()).rejects.toThrow("the batch reached its cap of 3 D1 statements");
+  });
+
+  it("ends the batch at D1's cap as a stop, with the capped repo's turn taken", async () => {
+    let statements = 0;
+    let cap = Infinity;
+    const db = testDb({
+      onStatement: () => {
+        statements += 1;
+        if (statements > cap) throw new D1CapReached(cap);
+      },
+    });
+    const gh = acme(history());
+    // Discovery only: its three requests spend the budget, so both repos are still unscanned.
+    await batch(db, gh.fetch, { budget: 3 }).done;
+    // Then discovery (2 statements), the pick (1) and the first turn (1) fit; that scan's first read does not.
+    statements = 0;
+    cap = 4;
+    const run = batch(db, gh.fetch, { now: at(1) });
+    const result = await run.done;
+
+    expect(result.stop).toBe("d1-cap");
+    expect(result.scanned).toHaveLength(1);
+    expect(run.lines.at(-1)).toMatch(/stopped: d1-cap$/);
+    cap = Infinity;
+    const next = await batch(db, gh.fetch, { now: at(2) }).done;
+    expect(next.scanned[0]?.name).not.toBe(result.scanned[0]?.name);
   });
 
   it("leaves the App unconfigured when the id or the key is empty, and never throws", async () => {

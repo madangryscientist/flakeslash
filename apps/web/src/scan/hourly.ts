@@ -13,7 +13,7 @@ import * as schema from "#/db/schema.ts";
 import { createGithubApp, type GithubAppConfig, type GithubFetch } from "#/github/app.ts";
 import { log as workerLog } from "#/server/log.ts";
 import { budgeted, type Budgeted } from "./budget.ts";
-import { capStatements, D1_STATEMENT_CAP } from "./d1-cap.ts";
+import { capStatements, D1_STATEMENT_CAP, isCapReached } from "./d1-cap.ts";
 import { discover } from "./discover.ts";
 
 const { repos } = schema;
@@ -44,7 +44,8 @@ export type Stop =
   | "all-scanned"
   | "budget"
   | "rate-limit"
-  | "repos";
+  | "repos"
+  | "d1-cap";
 
 export interface BatchResult {
   stop: Stop;
@@ -87,17 +88,25 @@ async function turns(db: BatchDb, tokens: Map<number, string>, cap: number): Pro
 }
 
 /**
- * Scans one repo; true when a rate limit (real or the budget's) cut it short. A throw is logged. The
+ * Scans one repo: "cut" when a rate limit (real or the budget's) cut it short, "cap" when D1's statement
+ * cap stopped it, else "done". Any other throw is logged. The
  * repo takes its turn (goes to the back of the rotation) before the scan, so a scan that ends the
  * invocation, as D1's statement cap does, has still had it, and one repo never starves the rest.
  */
-async function scanTurn(deps: BatchDeps, github: Budgeted, turn: Turn, since: string) {
+async function scanTurn(
+  deps: BatchDeps,
+  github: Budgeted,
+  turn: Turn,
+  since: string,
+): Promise<"done" | "cut" | "cap"> {
   const q: Db = deps.db;
-  await q
-    .update(repos)
-    .set({ scannedAt: deps.now.toISOString() })
-    .where(and(eq(repos.orgId, turn.orgId), eq(repos.name, turn.name)));
+  let turnTaken = false;
   try {
+    await q
+      .update(repos)
+      .set({ scannedAt: deps.now.toISOString() })
+      .where(and(eq(repos.orgId, turn.orgId), eq(repos.name, turn.name)));
+    turnTaken = true;
     const scan = await scanRepo({
       repo: turn.name,
       since,
@@ -105,10 +114,13 @@ async function scanTurn(deps: BatchDeps, github: Budgeted, turn: Turn, since: st
       token: turn.token,
       store: d1Store(deps.db, turn.orgId),
     });
-    return scan.cutShort;
+    return scan.cutShort ? "cut" : "done";
   } catch (error) {
+    if (isCapReached(error)) return "cap";
+    // Any other failure to take the turn is D1's, and ends the batch (`scheduled` logs it).
+    if (!turnTaken) throw error;
     deps.log(`scan of ${turn.name} failed: ${message(error)}`);
-    return false;
+    return "done";
   }
 }
 
@@ -118,9 +130,10 @@ async function scanTurns(deps: BatchDeps, github: Budgeted, { todo, more }: Pick
   const scanned: BatchResult["scanned"] = [];
   for (const turn of todo) {
     if (github.spent()) return { scanned, stop: "budget" as const };
-    const cutShort = await scanTurn(deps, github, turn, since);
+    const ended = await scanTurn(deps, github, turn, since);
     scanned.push({ orgId: turn.orgId, name: turn.name });
-    if (cutShort) {
+    if (ended === "cap") return { scanned, stop: "d1-cap" as const };
+    if (ended === "cut") {
       return { scanned, stop: github.spent() ? ("budget" as const) : ("rate-limit" as const) };
     }
   }

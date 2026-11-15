@@ -38,8 +38,8 @@ export const repos = sqliteTable(
     /** ISO 8601. */
     addedAt: text("added_at").notNull(),
     /**
-     * ISO 8601: when the hourly scan last finished a turn on this repo (returned, cut short or threw).
-     * Null until the first one. The scan takes repos oldest first, never-scanned first of all.
+     * ISO 8601: when the hourly scan last started a turn on this repo (written as the turn starts, so
+     * a turn that is cut short or throws still counts). Null until the first one. The scan takes repos oldest first, never-scanned first of all.
      */
     scannedAt: text("scanned_at"),
     isSmoke: isSmoke(),
