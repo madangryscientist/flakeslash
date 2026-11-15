@@ -15,7 +15,10 @@ import {
 } from "../../engine/test/github-fake.ts";
 import { SINCE, playwrightLog, text, useScan } from "./scan-harness.ts";
 
-/** One run: `Gate` fails a test from 10:00 to 10:01, then `Merge Reports` fails at 10:02 naming none. */
+/**
+ * One run: `Gate` fails a test from 10:00 to 10:01, then `Merge Reports` fails at 10:02 naming none. A
+ * rerun on the same commit passes both, so the test's failure is a proven flake and is ranked.
+ */
 function gatherRun() {
   const runId = 1;
   const gate = job(10, runId, {
@@ -29,10 +32,20 @@ function gatherRun() {
     started_at: "2026-11-03T10:02:00Z",
     completed_at: "2026-11-03T10:03:00Z",
   });
+  const rerunId = 2;
+  const sha = shaOf(runId);
+  const passed = { head_sha: sha, started_at: "2026-11-03T11:00:00Z" };
   return fakeGitHub({
-    [runsPath()]: runsOf(run(runId, "2026-11-03T09:59:00Z", { conclusion: "failure" })),
-    [pullsPath(shaOf(runId))]: json([]),
+    [runsPath()]: runsOf(
+      run(runId, "2026-11-03T09:59:00Z", { conclusion: "failure" }),
+      run(rerunId, "2026-11-03T10:59:00Z", { head_sha: sha }),
+    ),
+    [pullsPath(sha)]: json([]),
     [jobsPath(runId, 1)]: jobsOf(gate, merge),
+    [jobsPath(rerunId, 1)]: jobsOf(
+      job(20, rerunId, passed),
+      job(21, rerunId, { ...passed, name: "Merge Reports" }),
+    ),
     [logPath(10)]: text(playwrightLog(["uploads a file", "Error: expected 1 to be 2"])),
     [logPath(11)]: text("##[error]Process completed with exit code 1."),
   });

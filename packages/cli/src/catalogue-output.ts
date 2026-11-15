@@ -5,6 +5,7 @@
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
+  flakeRanking,
   rankIssues,
   type JobExcerpt,
   type RankedIssue,
@@ -14,7 +15,10 @@ import {
 import { minutesOf, reportHtml, type ReportInput } from "./report-html.ts";
 import { DEFAULT_STORE_PATH } from "./store.ts";
 
-/** The ranked issues of the repos scanned, read from the store as it stands after the scan. */
+/**
+ * The ranked flake candidates of the repos scanned, read from the store as it stands after the scan, and
+ * how many failing issues were left out of the ranking.
+ */
 export async function catalogueOf(
   store: Store,
   repos: string[],
@@ -28,17 +32,19 @@ export async function catalogueOf(
   for (const repo of stored) {
     for (const row of await store.readExcerpts(repo)) excerpts.set(row.url, row);
   }
-  const ranked = rankIssues({
-    records,
-    failures: await store.readFailures(),
-    issues: await store.readIssues(),
-    flakes: scans.flatMap((scan) => scan.flakes),
-    suspects: scans.flatMap((scan) => scan.suspects),
-    now,
-    followOn: new Set(scans.flatMap((scan) => scan.followOn)),
-  });
+  const { ranked, unranked } = flakeRanking(
+    rankIssues({
+      records,
+      failures: await store.readFailures(),
+      issues: await store.readIssues(),
+      flakes: scans.flatMap((scan) => scan.flakes),
+      suspects: scans.flatMap((scan) => scan.suspects),
+      now,
+      followOn: new Set(scans.flatMap((scan) => scan.followOn)),
+    }),
+  );
   const coverage = scans.map((scan) => ({ repo: scan.repo, coverage: scan.coverage }));
-  return { ranked, excerpts, repos, coverage, now };
+  return { ranked, unranked, excerpts, repos, coverage, now };
 }
 
 /** The catalogue's JSON: each ranked issue, in rank order. */

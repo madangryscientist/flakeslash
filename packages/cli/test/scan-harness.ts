@@ -72,15 +72,39 @@ export function failedRun(
 
 /** The routes of a set of runs, each `[repo, runId, log]`, with the run listing of each repo. */
 export function routesOf(...runs: [string, number, Reply][]): Record<string, Reply> {
+  return flakyRoutesOf(runs, []);
+}
+
+/**
+ * `routesOf`, plus a passing rerun of each run in `passedAgain` on the same commit, an hour later (run id
+ * plus 100), so the first run's failure is a proven flake.
+ */
+export function flakyRoutesOf(
+  runs: [string, number, Reply][],
+  passedAgain: [string, number][],
+): Record<string, Reply> {
   const routes: Record<string, Reply> = {};
   const byRepo = new Map<string, unknown[]>();
+  const list = (repo: string, listed: unknown) =>
+    byRepo.set(repo, [...(byRepo.get(repo) ?? []), listed]);
   for (const [repo, runId, log] of runs) {
     const made = failedRun(repo, runId, log)[repo];
     if (made === undefined) continue;
     Object.assign(routes, made.routes);
-    byRepo.set(repo, [...(byRepo.get(repo) ?? []), made.run]);
+    list(repo, made.run);
   }
-  for (const [repo, list] of byRepo) routes[runsPath(repo)] = runsOf(...list);
+  for (const [repo, runId] of passedAgain) {
+    const rerunId = runId + 100;
+    const sha = shaOf(runId);
+    list(repo, runOf(rerunId, "2026-11-04T01:00:00Z", { head_sha: sha }));
+    routes[jobsPath(rerunId, 1, repo)] = jobsOf(
+      job(rerunId * 10, rerunId, {
+        head_sha: sha,
+        html_url: `https://github.com/${repo}/actions/runs/${rerunId}/job/${rerunId * 10}`,
+      }),
+    );
+  }
+  for (const [repo, listing] of byRepo) routes[runsPath(repo)] = runsOf(...listing);
   return routes;
 }
 
