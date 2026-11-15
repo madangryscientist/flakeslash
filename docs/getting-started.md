@@ -4,7 +4,7 @@ FlakeSlash is in alpha: changing fast, so expect breaking changes between versio
 
 ```bash
 bun install
-bun run flakeslash --version     # flakeslash-engine 0.0.0
+bun run flakeslash --version     # flakeslash 0.1.0 (flakeslash-engine 0.0.0)
 bun run flakeslash --help
 GITHUB_TOKEN=<token> bun run flakeslash scan <owner/repo>
 ```

@@ -1,6 +1,6 @@
 {
   "name": "@hackcove/flakeslash",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "The FlakeSlash command line: flaky-test detection from the terminal.",
   "keywords": [
     "cli",
@@ -24,6 +24,9 @@
   "type": "module",
   "publishConfig": {
     "access": "public"
+  },
+  "scripts": {
+    "prepack": "cp ../../LICENSE ../../NOTICE . && bun build src/index.ts --outfile dist/index.js --target bun"
   },
   "devDependencies": {
     "@hackcove/flakeslash-engine": "workspace:*",
