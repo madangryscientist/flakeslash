@@ -1,9 +1,13 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { githubHeaders, isRecord } from "#/auth/github.ts";
+import { nextLink } from "#/github/app.ts";
 import { type Viewer, signedIn } from "#/auth/viewer.ts";
-import { readFailures, readIssues } from "#/db/catalogue.ts";
+import { readCompares, readFailures, readIssues, readJobs } from "#/db/catalogue.ts";
+import { compareFromRow, failureFromRow, issueFromRow, jobFromRow } from "#/db/rows.ts";
 import { organisations } from "#/db/schema.ts";
+import { real } from "#/db/synthetic.ts";
 import { endSessionById } from "#/db/users.ts";
+import type { RankRows } from "./rank.ts";
 
 /**
  * The one gate every data query a person reads goes through. Routes import from here, never from
@@ -55,9 +59,17 @@ function once<K, V>(map: Map<K, Promise<V>>, key: K, load: () => Promise<V>): Pr
  * a token GitHub no longer takes (the person revoked the App): the session ends and they sign in.
  */
 async function githubGet(viewer: Viewer, path: string): Promise<unknown> {
-  const res = await fetch(new URL(path, viewer.apiBase), {
-    headers: githubHeaders(viewer.accessToken),
-  });
+  return (await githubFetch(viewer, new URL(path, viewer.apiBase))).body;
+}
+
+/** One GET as the person: its body as `githubGet` reads it, and the response for its headers. */
+async function githubFetch(viewer: Viewer, url: URL): Promise<{ body: unknown; res: Response }> {
+  const path = url.pathname;
+  const res = await fetch(url, { headers: githubHeaders(viewer.accessToken) });
+  return { body: await bodyOf(viewer, path, res), res };
+}
+
+async function bodyOf(viewer: Viewer, path: string, res: Response): Promise<unknown> {
   if (res.status === 401) {
     await endSessionById(viewer.db, viewer.sessionId);
     signedIn(null);
@@ -68,6 +80,22 @@ async function githubGet(viewer: Viewer, path: string): Promise<unknown> {
   if (res.status === 403 && !(await rateLimited(res))) return null;
   if (!res.ok) throw new Error(`GitHub ${path} answered ${res.status}`);
   return res.json();
+}
+
+/**
+ * Every page of a list GET, following the `Link` header's next URL until there is none. A next URL off
+ * the API base is refused: the person's token goes nowhere else.
+ */
+async function githubPages(viewer: Viewer, path: string): Promise<unknown[]> {
+  const base = viewer.apiBase.replace(/\/+$/, "");
+  const pages: unknown[] = [];
+  let url: string | null = `${base}${path}`;
+  while (url !== null) {
+    const page = await githubFetch(viewer, new URL(url));
+    pages.push(page.body);
+    url = nextLink(page.res.headers.get("link"), base);
+  }
+  return pages;
 }
 
 async function rateLimited(res: Response): Promise<boolean> {
@@ -134,8 +162,8 @@ export async function access(
   return own.filter((_, i) => held[i]);
 }
 
-type Issue = Awaited<ReturnType<typeof readIssues>>[number];
-type Failure = Awaited<ReturnType<typeof readFailures>>[number];
+type IssueRow = Awaited<ReturnType<typeof readIssues>>[number];
+type FailureRow = Awaited<ReturnType<typeof readFailures>>[number];
 
 /**
  * The organisation's issues as the person may see them: each with only the failures from repos
@@ -144,7 +172,7 @@ type Failure = Awaited<ReturnType<typeof readFailures>>[number];
 export async function issuesFor(
   viewer: Viewer,
   orgId: number,
-): Promise<(Issue & { failures: Failure[] })[]> {
+): Promise<(IssueRow & { failures: FailureRow[] })[]> {
   const [issues, failures] = await Promise.all([
     readIssues(viewer.db, orgId),
     readFailures(viewer.db, orgId),
@@ -152,7 +180,7 @@ export async function issuesFor(
   const viewable = new Set(
     await access(viewer, orgId, [...new Set(failures.map((f) => f.repo))], "view"),
   );
-  const byIssue = new Map<string, Failure[]>();
+  const byIssue = new Map<string, FailureRow[]>();
   for (const failure of failures) {
     if (!viewable.has(failure.repo)) continue;
     const list = byIssue.get(failure.issueId);
@@ -163,4 +191,71 @@ export async function issuesFor(
     const evidence = byIssue.get(issue.id);
     return evidence ? [{ ...issue, failures: evidence }] : [];
   });
+}
+
+/** D1 binds at most 100 values a statement; `real()` takes one of them. */
+const ORG_IDS_PER_QUERY = 90;
+
+/** The ids of the accounts the person reaches an installation of the App on. */
+async function installedAccounts(viewer: Viewer): Promise<number[]> {
+  const pages = await githubPages(viewer, "/user/installations?per_page=100");
+  return pages.flatMap((page) => {
+    const list = isRecord(page) ? page["installations"] : null;
+    if (!Array.isArray(list)) return [];
+    return list.flatMap((installation: unknown) => {
+      const account = isRecord(installation) ? installation["account"] : null;
+      return isRecord(account) && typeof account["id"] === "number" ? [account["id"]] : [];
+    });
+  });
+}
+
+/**
+ * The organisations the person can reach: those with a row whose id is the account of an installation
+ * GitHub lists for them, sorted by login.
+ */
+export async function orgsFor(viewer: Viewer): Promise<Org[]> {
+  const ids = [...new Set(await installedAccounts(viewer))];
+  const chunks: number[][] = [];
+  for (let at = 0; at < ids.length; at += ORG_IDS_PER_QUERY)
+    chunks.push(ids.slice(at, at + ORG_IDS_PER_QUERY));
+  const found = await Promise.all(
+    chunks.map((chunk) =>
+      viewer.db
+        .select({ id: organisations.id, login: organisations.login, type: organisations.type })
+        .from(organisations)
+        .where(and(inArray(organisations.id, chunk), real(organisations.isSmoke))),
+    ),
+  );
+  return found.flat().toSorted((a, b) => (a.login < b.login ? -1 : Number(a.login > b.login)));
+}
+
+/**
+ * One organisation's catalogue as the person may see it, as engine types: the failures, jobs and
+ * compares of the repos they can view (a compare carries a private repo's file list), and the issues
+ * with at least one of those failures. GitHub is asked only for the permissions.
+ */
+export async function catalogueFor(viewer: Viewer, orgId: number): Promise<RankRows> {
+  const [issueRows, failureRows, jobRows, compareRows] = await Promise.all([
+    readIssues(viewer.db, orgId),
+    readFailures(viewer.db, orgId),
+    readJobs(viewer.db, orgId),
+    readCompares(viewer.db, orgId),
+  ]);
+  const repos = new Set([...failureRows, ...jobRows, ...compareRows].map((row) => row.repo));
+  const viewable = new Set(await access(viewer, orgId, [...repos], "view"));
+  const failures = failureRows.filter((row) => viewable.has(row.repo)).map(failureFromRow);
+  const evidenced = new Set(failures.map((failure) => failure.issueId));
+  return {
+    issues: issueRows.filter((row) => evidenced.has(row.id)).map(issueFromRow),
+    failures,
+    jobs: jobRows.filter((row) => viewable.has(row.repo)).map(jobFromRow),
+    compares: compareRows
+      .filter((row) => viewable.has(row.repo))
+      .map((row) => ({
+        repo: row.repo,
+        base: row.base,
+        head: row.head,
+        result: compareFromRow(row),
+      })),
+  };
 }

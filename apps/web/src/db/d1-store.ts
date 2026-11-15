@@ -6,53 +6,18 @@
 import { and, asc, eq } from "drizzle-orm";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
 import type { SqliteRemoteDatabase } from "drizzle-orm/sqlite-proxy";
-import { isRunner, type JobExcerpt, type JobRecord, type Store } from "@hackcove/flakeslash-engine";
+import type { JobRecord, Store } from "@hackcove/flakeslash-engine";
 import { attemptMethods } from "./d1-attempt-store.ts";
 import { catalogueMethods } from "./d1-catalogue-store.ts";
 import { compareMethods } from "./d1-compare-store.ts";
 import { upsertAll, type Scope } from "./d1-store-shared.ts";
+import { jobFromRow, statusOf } from "./rows.ts";
 import * as schema from "./schema.ts";
 
 const { excerpts, jobs } = schema;
 
 /** A Drizzle handle with `batch`: D1 in production, the `testDb()` proxy in tests. */
 export type BatchDb = SqliteRemoteDatabase<typeof schema> | DrizzleD1Database<typeof schema>;
-
-function statusOf(value: string): JobExcerpt["status"] {
-  if (value !== "kept" && value !== "gone") {
-    throw new Error(`the store holds an unknown excerpt status: ${value}`);
-  }
-  return value;
-}
-
-function providerOf(value: string): JobRecord["provider"] {
-  if (value !== "github-actions") throw new Error(`the store holds an unknown provider: ${value}`);
-  return value;
-}
-
-function jobFromRow(row: typeof jobs.$inferSelect): JobRecord {
-  if (!isRunner(row.runner)) throw new Error(`the store holds an unknown runner: ${row.runner}`);
-  return {
-    repo: row.repo,
-    workflow: row.workflow,
-    jobName: row.jobName,
-    jobId: row.jobId,
-    url: row.url,
-    commit: row.commitSha,
-    branch: row.branch,
-    prNumber: row.prNumber,
-    provider: providerOf(row.provider),
-    runner: row.runner,
-    runnerName: row.runnerName,
-    runId: row.runId,
-    runAttempt: row.runAttempt,
-    conclusion: row.conclusion,
-    startedAt: row.startedAt,
-    completedAt: row.completedAt,
-    steps: JSON.parse(row.steps),
-    annotations: JSON.parse(row.annotations),
-  };
-}
 
 function jobRow(own: Scope["own"], job: JobRecord): typeof jobs.$inferInsert {
   return {

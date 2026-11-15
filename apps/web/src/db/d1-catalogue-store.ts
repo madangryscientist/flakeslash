@@ -1,42 +1,9 @@
 /** The issue, failure and model call methods of `d1Store`, and the merge of issues. */
 import { and, asc, eq } from "drizzle-orm";
-import {
-  KINDS,
-  type Explanation,
-  type Issue,
-  type IssueSignature,
-  type ModelCall,
-  type Store,
-} from "@hackcove/flakeslash-engine";
+import type { Issue, Store } from "@hackcove/flakeslash-engine";
 import { runBatch, upsertAll, upserts, type Scope, type Statement } from "./d1-store-shared.ts";
+import { failureFromRow, issueFromRow, outcomeOf } from "./rows.ts";
 import { failures, issues, modelCalls } from "./schema.ts";
-
-function outcomeOf(value: string): ModelCall["outcome"] {
-  if (value !== "explained" && value !== "invalid") {
-    throw new Error(`the store holds an unknown model call outcome: ${value}`);
-  }
-  return value;
-}
-
-function issueFromRow(row: typeof issues.$inferSelect): Issue {
-  const kind = KINDS.find((known) => known === row.kind);
-  if (kind === undefined) throw new Error(`the store holds an unknown issue kind: ${row.kind}`);
-  if (row.status !== "potential" && row.status !== "confirmed" && row.status !== "dismissed") {
-    throw new Error(`the store holds an unknown issue status: ${row.status}`);
-  }
-  const signatures: IssueSignature[] = JSON.parse(row.signatures);
-  const explanation: Explanation | null =
-    row.explanation === null ? null : JSON.parse(row.explanation);
-  return {
-    id: row.id,
-    name: row.name,
-    kind,
-    status: row.status,
-    signatures,
-    explanation,
-    edited: row.edited,
-  };
-}
 
 function issueRow(own: Scope["own"], issue: Issue): typeof issues.$inferInsert {
   return {
@@ -108,17 +75,7 @@ function failureMethods(
         .from(failures)
         .where(eq(failures.orgId, orgId))
         .orderBy(asc(failures.repo), asc(failures.jobId), asc(failures.signature));
-      return rows.map((row) => ({
-        repo: row.repo,
-        jobId: row.jobId,
-        url: row.url,
-        signature: row.signature,
-        issueId: row.issueId,
-        file: row.file,
-        title: row.title,
-        location: row.location,
-        errorLine: row.errorLine,
-      }));
+      return rows.map(failureFromRow);
     },
   };
 }

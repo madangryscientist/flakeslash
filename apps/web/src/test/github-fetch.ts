@@ -11,20 +11,23 @@ export const config: GithubConfig = {
 };
 
 type Answer = { status?: number; body?: unknown; headers?: Record<string, string> };
-type Route = (call: { body: unknown; authorization: string | null }) => Answer | Promise<Answer>;
+type Call = { route: string; url: URL; body: unknown; authorization: string | null };
+type Route = (call: Call) => Answer | Promise<Answer>;
 
 /**
  * Stands in for GitHub by replacing `fetch`: each route is `METHOD path` on either base, and
- * anything else fails the test. No network. Returns every call made, in order.
+ * anything else fails the test. A handler also gets the request URL, query included. No network.
+ * Returns every call made, in order.
  */
 export function stubGithub(routes: Record<string, Route>) {
-  const calls: { route: string; body: unknown; authorization: string | null }[] = [];
+  const calls: Call[] = [];
   vi.stubGlobal("fetch", async (input: URL | string, init: RequestInit = {}) => {
     const url = new URL(input);
     const route = `${init.method ?? "GET"} ${url.pathname}`;
     const headers = new Headers(init.headers);
-    const call = {
+    const call: Call = {
       route,
+      url,
       body: typeof init.body === "string" ? JSON.parse(init.body) : undefined,
       authorization: headers.get("authorization"),
     };

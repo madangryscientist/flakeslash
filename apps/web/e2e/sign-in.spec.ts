@@ -4,13 +4,14 @@ import { expect, test } from "@playwright/test";
 test("sign in with GitHub, then sign out", async ({ page }) => {
   const pageErrors: Error[] = [];
   page.on("pageerror", (error) => pageErrors.push(error));
-  // The home page has no sign-in link yet, so the run starts the flow where a link would.
-  await page.goto("/auth/github");
+  await page.goto("/");
+  await page.getByRole("link", { name: "Sign in with GitHub" }).click();
   await expect(page).toHaveURL("/");
   await expect(page.getByText("Signed in as e2e-octocat")).toBeVisible();
 
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page.locator("h1")).toHaveText("FlakeSlash");
   await expect(page.getByText("Signed in as")).toBeHidden();
+  await expect(page.getByRole("link", { name: "Sign in with GitHub" })).toBeVisible();
   expect(pageErrors.map((error) => error.message)).toEqual([]);
 });
