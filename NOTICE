@@ -4,7 +4,7 @@ Copyright 2026 Jacobus Langner and the FlakeSlash contributors
 FlakeSlash is licensed under the Elastic License 2.0; see LICENSE.
 
 The dashboard uses the Catppuccin Mocha colour palette through
-@hackcove/theme-catppuccin-mocha.
+@hackcove/themes.
 
 Catppuccin Mocha palette: MIT
 Copyright (c) 2021 Catppuccin

@@ -22,7 +22,7 @@ function RootDocument({ children }: { children: ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <body className="antialiased">
+      <body>
         {children}
         <Scripts />
       </body>
