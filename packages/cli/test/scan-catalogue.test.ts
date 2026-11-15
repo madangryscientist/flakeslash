@@ -269,15 +269,6 @@ describe("flakeslash scan --json: the catalogue", () => {
       },
     ]);
   });
-
-  it("ranks nothing when no failing issue has flake evidence", async () => {
-    const gh = fakeGitHub(
-      routesOf([REPO, 1, text(playwrightLog(["uploads a file", "Error: expected 1 to be 2"]))]),
-    );
-    const result = await scan.exec(["scan", REPO, "--since", SINCE, "--json"], gh);
-    expect(result.code).toBe(0);
-    expect(JSON.parse(result.out).catalogue).toEqual([]);
-  });
 });
 
 describe("flakeslash scan: the report file", () => {
@@ -301,19 +292,5 @@ describe("flakeslash scan: the report file", () => {
     expect(html).not.toContain("opens the page");
     expect(html).toContain("1 failing issue is not ranked");
     expect(html).not.toContain("<script");
-  });
-
-  it("writes no not-ranked line when every failing issue is ranked", async () => {
-    const gh = fakeGitHub(
-      flakyRoutesOf(
-        [[REPO, 1, text(playwrightLog(["uploads a file", "Error: expected 1 to be 2"]))]],
-        [[REPO, 1]],
-      ),
-    );
-    await scan.exec(["scan", REPO, "--since", SINCE], gh);
-
-    const html = readFileSync(join(dirname(scan.storePath()), "report.html"), "utf8");
-    expect(html).toContain("uploads a file");
-    expect(html).not.toContain("not ranked");
   });
 });

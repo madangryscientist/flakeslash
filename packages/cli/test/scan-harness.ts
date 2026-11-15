@@ -72,16 +72,7 @@ export function failedRun(
 
 /** The routes of a set of runs, each `[repo, runId, log]`, with the run listing of each repo. */
 export function routesOf(...runs: [string, number, Reply][]): Record<string, Reply> {
-  const routes: Record<string, Reply> = {};
-  const byRepo = new Map<string, unknown[]>();
-  for (const [repo, runId, log] of runs) {
-    const made = failedRun(repo, runId, log)[repo];
-    if (made === undefined) continue;
-    Object.assign(routes, made.routes);
-    byRepo.set(repo, [...(byRepo.get(repo) ?? []), made.run]);
-  }
-  for (const [repo, list] of byRepo) routes[runsPath(repo)] = runsOf(...list);
-  return routes;
+  return flakyRoutesOf(runs, []);
 }
 
 /**
@@ -92,18 +83,20 @@ export function flakyRoutesOf(
   runs: [string, number, Reply][],
   passedAgain: [string, number][],
 ): Record<string, Reply> {
-  const routes = routesOf(...runs);
+  const routes: Record<string, Reply> = {};
   const byRepo = new Map<string, unknown[]>();
+  const list = (repo: string, listed: unknown) =>
+    byRepo.set(repo, [...(byRepo.get(repo) ?? []), listed]);
   for (const [repo, runId, log] of runs) {
-    byRepo.set(repo, [...(byRepo.get(repo) ?? []), failedRun(repo, runId, log)[repo]?.run]);
+    const made = failedRun(repo, runId, log)[repo];
+    if (made === undefined) continue;
+    Object.assign(routes, made.routes);
+    list(repo, made.run);
   }
   for (const [repo, runId] of passedAgain) {
     const rerunId = runId + 100;
     const sha = shaOf(runId);
-    byRepo.set(repo, [
-      ...(byRepo.get(repo) ?? []),
-      runOf(rerunId, "2026-11-04T01:00:00Z", { head_sha: sha }),
-    ]);
+    list(repo, runOf(rerunId, "2026-11-04T01:00:00Z", { head_sha: sha }));
     routes[jobsPath(rerunId, 1, repo)] = jobsOf(
       job(rerunId * 10, rerunId, {
         head_sha: sha,
@@ -111,7 +104,7 @@ export function flakyRoutesOf(
       }),
     );
   }
-  for (const [repo, list] of byRepo) routes[runsPath(repo)] = runsOf(...list);
+  for (const [repo, listing] of byRepo) routes[runsPath(repo)] = runsOf(...listing);
   return routes;
 }
 
