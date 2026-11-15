@@ -117,7 +117,34 @@ function isMatch(line: string): boolean {
   return KEYWORDS.some((keyword) => lower.includes(keyword)) || EXIT_CODE.test(counted);
 }
 
-/** The lines of one step within `CONTEXT` of a match, in order, with a gap marked wherever lines were dropped. */
+/**
+ * Bun's file header, `test/a.test.ts:`, bare or as a `##[group]` or `::group::` line, with moon's
+ * `<target> | ` prefix allowed as in `PASS_LINE`. Bun prints it once, above all of the file's tests.
+ */
+const FILE_LINE =
+  /^\s*(?:\S+ \| )?(?:##\[group\]|::group::)?\S.*?\.(?:test|spec)\.[cm]?[jt]sx?:\s*$/;
+
+/** The end of a group, where a file header above it stops applying. Moon's prefix is allowed. */
+const GROUP_END_LINE = /^\s*(?:\S+ \| )?(?:##\[endgroup\]|::endgroup::)/;
+
+/**
+ * The index of the file header that applies to the line at `index`: the nearest one above it, unless
+ * a group ends first. Undefined when the step starts or a group ends before one is found.
+ */
+function fileLineAbove(step: string[], index: number): number | undefined {
+  for (let i = index - 1; i >= 0; i--) {
+    const line = step[i] ?? "";
+    if (GROUP_END_LINE.test(line)) return undefined;
+    if (FILE_LINE.test(line)) return i;
+  }
+  return undefined;
+}
+
+/**
+ * The lines of one step within `CONTEXT` of a match, in order, with a gap marked wherever lines were
+ * dropped. A window that follows a gap is headed by the file line that applies to it, when that line
+ * was dropped, so a test failure keeps the name of its file.
+ */
 function excerptStep(step: string[]): string[] {
   const keep = step.map(() => false);
   step.forEach((line, index) => {
@@ -131,7 +158,11 @@ function excerptStep(step: string[]): string[] {
   let previous = -1;
   step.forEach((line, index) => {
     if (!keep[index]) return;
-    if (index > previous + 1) out.push(GAP);
+    if (index > previous + 1) {
+      out.push(GAP);
+      const header = fileLineAbove(step, index);
+      if (header !== undefined && !keep[header]) out.push(step[header] ?? "");
+    }
     out.push(line);
     previous = index;
   });

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { cleanLog, cutLog } from "../src/index.ts";
+import { cleanLog, cutLog, signatures } from "../src/index.ts";
 
 /** A line from a passing step. It holds no keyword, so it must never reach an excerpt. */
 const PASSING_MARKER = "zz-passing-marker";
@@ -298,5 +298,63 @@ describe("cutLog does not keep a pass as a failure", () => {
     const out = cutLog(log);
 
     expect(out).not.toContain("(pass) a timeout test");
+  });
+});
+
+describe("cutLog keeps the file line a moon failure belongs to", () => {
+  const groupLine = `${moonPrefix("cli-core:test")}::group::test/a.test.ts:`;
+  const failLine = `${moonPrefix("cli-core:test")}(fail) a test`;
+  const quiet = Array.from({ length: 20 }, (_, i) => `${moonPrefix("cli-core:test")}quiet ${i}`);
+
+  function moonStep(between: string[]): string {
+    return [
+      "##[group]Run moon run :test",
+      groupLine,
+      ...between,
+      failLine,
+      "  × Task cli-core:test failed to run.",
+      "##[error]Process completed with exit code 1.",
+    ].join("\n");
+  }
+
+  it("puts the dropped group line after the gap and before the failure's window", () => {
+    const lines = cutLog(moonStep(quiet)).split("\n");
+
+    const gap = lines.indexOf("…");
+    expect(gap).toBeGreaterThanOrEqual(0);
+    expect(lines[gap + 1]).toBe(groupLine);
+    expect(lines.indexOf(failLine)).toBeGreaterThan(gap + 1);
+    expect(lines.filter((line) => line === groupLine)).toHaveLength(1);
+  });
+
+  it("does not bring back a group line that a group end closed", () => {
+    const between = [
+      ...quiet.slice(0, 5),
+      `${moonPrefix("cli-core:test")}::endgroup::`,
+      ...quiet.slice(5),
+    ];
+
+    const out = cutLog(moonStep(between));
+
+    expect(out).not.toContain("::group::test/a.test.ts:");
+    expect(out).toContain(failLine);
+  });
+
+  it("keeps a group line already inside the window once", () => {
+    const lines = cutLog(moonStep(quiet.slice(0, 3))).split("\n");
+
+    expect(lines.filter((line) => line === groupLine)).toHaveLength(1);
+    expect(lines.indexOf(groupLine)).toBeLessThan(lines.indexOf(failLine));
+  });
+
+  it("gives the cut a signature that names the file and the title", () => {
+    const found = signatures(cutLog(moonStep(quiet)), {
+      repo: "madangryscientist/flakeslash",
+      workflow: "ci",
+      jobName: "gate",
+    });
+
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ file: "test/a.test.ts", title: "a test" });
   });
 });
