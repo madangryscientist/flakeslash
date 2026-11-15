@@ -1,13 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { describeEngine } from "@hackcove/flakeslash-engine";
+import { AppShell, PageHeading } from "@hackcove/ui-react";
 
 export const Route = createFileRoute("/")({ component: Home });
 
 function Home() {
   return (
-    <main className="mx-auto max-w-2xl p-8">
-      <h1 className="text-3xl font-bold">FlakeSlash</h1>
-      <p>The dashboard. It detects nothing yet ({describeEngine()}).</p>
-    </main>
+    <AppShell>
+      <PageHeading>FlakeSlash</PageHeading>
+      <p>
+        The dashboard is not built yet. The local scan runs from the flakeslash CLI (
+        {describeEngine()}).
+      </p>
+    </AppShell>
   );
 }
