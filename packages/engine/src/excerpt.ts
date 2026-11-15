@@ -127,23 +127,44 @@ const FILE_LINE =
 /** The end of a group, where a file header above it stops applying. Moon's prefix is allowed. */
 const GROUP_END_LINE = /^\s*(?:\S+ \| )?(?:##\[endgroup\]|::endgroup::)/;
 
+/** Moon's `<target> | ` prefix, captured: the task that printed the line. */
+const MOON_TARGET = /^\s*(\S+) \| /;
+
 /**
  * The index of the file header that applies to the line at `index`: the nearest one above it, unless
- * a group ends first. Undefined when the step starts or a group ends before one is found.
+ * a group ends first. Undefined when the step starts or a group ends before one is found. Moon
+ * interleaves the lines of tasks run at once, so with a `target`, lines another task printed are
+ * passed over.
  */
-function fileLineAbove(step: string[], index: number): number | undefined {
+function fileLineAbove(
+  step: string[],
+  index: number,
+  target: string | undefined,
+): number | undefined {
   for (let i = index - 1; i >= 0; i--) {
     const line = step[i] ?? "";
+    const lineTarget = MOON_TARGET.exec(line)?.[1];
+    if (target !== undefined && lineTarget !== undefined && lineTarget !== target) continue;
     if (GROUP_END_LINE.test(line)) return undefined;
     if (FILE_LINE.test(line)) return i;
   }
   return undefined;
 }
 
+/** The moon target of the first match in the window that starts at `index`, if it carries one. */
+function windowTarget(step: string[], keep: boolean[], index: number): string | undefined {
+  for (let i = index; i < step.length && keep[i]; i++) {
+    const line = step[i] ?? "";
+    if (isMatch(line)) return MOON_TARGET.exec(line)?.[1];
+  }
+  return undefined;
+}
+
 /**
  * The lines of one step within `CONTEXT` of a match, in order, with a gap marked wherever lines were
- * dropped. A window that follows a gap is headed by the file line that applies to it, when that line
- * was dropped, so a test failure keeps the name of its file.
+ * dropped. A window that follows a gap is headed by the file line that applies to it, even when an
+ * earlier window holds that line, because the gap ends the file for whoever reads the cut. A test
+ * failure keeps the name of its file that way.
  */
 function excerptStep(step: string[]): string[] {
   const keep = step.map(() => false);
@@ -160,8 +181,8 @@ function excerptStep(step: string[]): string[] {
     if (!keep[index]) return;
     if (index > previous + 1) {
       out.push(GAP);
-      const header = fileLineAbove(step, index);
-      if (header !== undefined && !keep[header]) out.push(step[header] ?? "");
+      const header = fileLineAbove(step, index, windowTarget(step, keep, index));
+      if (header !== undefined) out.push(step[header] ?? "");
     }
     out.push(line);
     previous = index;
