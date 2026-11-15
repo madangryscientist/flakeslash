@@ -2,13 +2,9 @@
 import { and, eq } from "drizzle-orm";
 import type { Store } from "@hackcove/flakeslash-engine";
 import { upsertAll, type Scope } from "./d1-store-shared.ts";
+import { compareFromRow } from "./rows.ts";
 import { compares } from "./schema.ts";
 
-function isNames(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((name) => typeof name === "string");
-}
-
-/** A NULL list is a commit GitHub no longer has. */
 export function compareMethods(scope: Scope): Pick<Store, "readCompare" | "writeCompare"> {
   const { q, orgId, own } = scope;
   return {
@@ -24,12 +20,7 @@ export function compareMethods(scope: Scope): Pick<Store, "readCompare" | "write
             eq(compares.head, head),
           ),
         );
-      if (row === undefined) return null;
-      if (row.files === null) return { status: "missing" };
-      const parsed: unknown = JSON.parse(row.files);
-      if (!isNames(parsed))
-        throw new Error("the store holds a compare that is not a list of files");
-      return { status: "ok", files: parsed };
+      return row === undefined ? null : compareFromRow(row);
     },
     async writeCompare(repo, base, head, result) {
       // A rate limit did not answer the question, so it is never stored.

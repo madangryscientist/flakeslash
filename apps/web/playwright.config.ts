@@ -4,8 +4,8 @@ const PORT = 4320;
 // The GitHub stand-in (e2e/github-stub.ts); vite.config.ts points the e2e build at it.
 const STUB_PORT = "4321";
 
-// Happy paths only, against a local test build on an empty local D1 (`.wrangler/e2e`), signing in
-// through a GitHub stand-in.
+// Happy paths only, against a local test build on a fresh local D1 (`.wrangler/e2e`) seeded by
+// `e2e/seed.ts`, signing in through a GitHub stand-in.
 export default defineConfig({
   testDir: "./e2e",
   globalSetup: "../../scripts/test-tmp-scope.ts",
@@ -28,6 +28,8 @@ export default defineConfig({
         "mkdir -p .wrangler/e2e/tmp",
         "bun run build",
         "wrangler d1 migrations apply DB --local --env e2e --persist-to .wrangler/e2e",
+        "bun e2e/seed.ts .wrangler/e2e/seed.sql",
+        "wrangler d1 execute DB --local --env e2e --persist-to .wrangler/e2e --file .wrangler/e2e/seed.sql",
         `vite preview --port ${PORT} --strictPort`,
       ].join(" && "),
       env: {

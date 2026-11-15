@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { Viewer } from "#/auth/viewer.ts";
-import { failures, issues, organisations, sessions } from "#/db/schema.ts";
+import { compares, failures, issues, jobs, organisations, sessions } from "#/db/schema.ts";
 import { testDb } from "#/db/test-db.ts";
 import { isRedirect } from "@tanstack/react-router";
 import { createSession, sessionUser, signInGithubUser } from "#/db/users.ts";
+import { compareRow, jobRow } from "#/test/catalogue-rows.ts";
 import { TEST_TOKEN_KEY, config, stubGithub, tokens } from "#/test/github-fetch.ts";
-import { access, issuesFor } from "./access.ts";
+import { access, catalogueFor, issuesFor, orgsFor } from "./access.ts";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -191,5 +192,123 @@ describe("admin", () => {
     const calls = stubGithub({});
     expect(await access(v, 555, ["ghost/app"], "admin")).toEqual([]);
     expect(calls).toEqual([]);
+  });
+});
+
+const openIssue = (id: string) => ({ ...issue(id), status: "potential" });
+
+describe("catalogueFor", () => {
+  test("a smoke row never reaches the result", async () => {
+    const v = await viewer();
+    await v.db
+      .insert(issues)
+      .values([openIssue("key:boom"), { ...openIssue("key:smoke"), isSmoke: true }]);
+    await v.db
+      .insert(failures)
+      .values([failure("acme/app", 1), { ...failure("acme/app", 2, "key:smoke"), isSmoke: true }]);
+    await v.db
+      .insert(jobs)
+      .values([jobRow(ACME, "acme/app", 1), { ...jobRow(ACME, "acme/app", 2), isSmoke: true }]);
+    await v.db
+      .insert(compares)
+      .values([
+        compareRow(ACME, "acme/app"),
+        { ...compareRow(ACME, "acme/app"), head: "c3", isSmoke: true },
+      ]);
+    stubGithub({ "GET /repos/acme/app": () => perms(true, false) });
+    const seen = await catalogueFor(v, ACME);
+    expect(seen.issues.map((i) => i.id)).toEqual(["key:boom"]);
+    expect(seen.failures.map((f) => f.jobId)).toEqual([1]);
+    expect(seen.jobs.map((j) => j.jobId)).toEqual([1]);
+    expect(seen.compares.map((c) => c.head)).toEqual(["c2"]);
+  });
+
+  test("leaves out the rows of a repo the person cannot view, and an issue with no viewable failure", async () => {
+    const v = await viewer();
+    await v.db.insert(issues).values([openIssue("key:boom"), openIssue("key:hidden")]);
+    await v.db
+      .insert(failures)
+      .values([
+        failure("acme/app", 1),
+        failure("acme/secret", 2),
+        failure("acme/secret", 3, "key:hidden"),
+      ]);
+    await v.db
+      .insert(jobs)
+      .values([
+        jobRow(ACME, "acme/app", 1),
+        jobRow(ACME, "acme/secret", 2),
+        jobRow(ACME, "acme/secret", 3),
+      ]);
+    await v.db
+      .insert(compares)
+      .values([compareRow(ACME, "acme/app"), compareRow(ACME, "acme/secret")]);
+    const calls = stubGithub({
+      "GET /repos/acme/app": () => perms(true, false),
+      "GET /repos/acme/secret": notFound,
+    });
+    const seen = await catalogueFor(v, ACME);
+    expect(seen.issues.map((i) => i.id)).toEqual(["key:boom"]);
+    expect(seen.failures.map((f) => f.repo)).toEqual(["acme/app"]);
+    expect(seen.jobs.map((j) => j.repo)).toEqual(["acme/app"]);
+    expect(seen.compares).toEqual([
+      { repo: "acme/app", base: "c1", head: "c2", result: { status: "ok", files: ["src/a.ts"] } },
+    ]);
+    // Only the permission checks, one per repo.
+    expect(calls.map((c) => c.route).toSorted()).toEqual([
+      "GET /repos/acme/app",
+      "GET /repos/acme/secret",
+    ]);
+  });
+});
+
+const installation = (id: number, login: string) => ({
+  account: { id, login, type: "Organization" },
+});
+
+describe("orgsFor", () => {
+  test("returns only the organisations the person reaches an installation of, across pages, by login", async () => {
+    const v = await viewer();
+    await v.db.insert(organisations).values([
+      { id: 202, login: "zeta", type: "Organization", createdAt: NOW },
+      { id: 303, login: "unreached", type: "Organization", createdAt: NOW },
+      { id: 404, login: "smoke", type: "Organization", createdAt: NOW, isSmoke: true },
+    ]);
+    const calls = stubGithub({
+      "GET /user/installations": ({ url }) =>
+        url.searchParams.get("page") === "2"
+          ? { body: { installations: [installation(ACME, "acme"), installation(999, "nobody")] } }
+          : {
+              body: { installations: [installation(202, "zeta"), installation(404, "smoke")] },
+              headers: {
+                link: `<${config.apiBase}/user/installations?per_page=100&page=2>; rel="next", <${config.apiBase}/user/installations?per_page=100&page=2>; rel="last"`,
+              },
+            },
+    });
+    expect((await orgsFor(v)).map((o) => o.login)).toEqual(["acme", "zeta"]);
+    expect(calls.map((c) => c.url.searchParams.get("page"))).toEqual([null, "2"]);
+    expect(calls.every((c) => c.authorization === "Bearer ghu_ada")).toBe(true);
+  });
+
+  test("refuses a next page off the API base", async () => {
+    const v = await viewer();
+    stubGithub({
+      "GET /user/installations": () => ({
+        body: { installations: [] },
+        headers: { link: '<https://elsewhere.test/user/installations?page=2>; rel="next"' },
+      }),
+    });
+    await expect(orgsFor(v)).rejects.toThrow("off the API base");
+  });
+
+  test("a token GitHub no longer takes ends the session", async () => {
+    const v = await viewer();
+    stubGithub({
+      "GET /user/installations": () => ({ status: 401, body: { message: "Bad credentials" } }),
+    });
+    const thrown = await orgsFor(v).catch((error: unknown) => error);
+    expect(isRedirect(thrown)).toBe(true);
+    const [row] = await v.db.select().from(sessions);
+    expect(row).toBeUndefined();
   });
 });
