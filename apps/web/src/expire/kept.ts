@@ -20,9 +20,12 @@ export interface Held {
   orgId: number;
   jobs: JobRecord[];
   failures: Failure[];
-  /** Every run attempt. */
+  /** Every run attempt, and every orphan run (jobs with no `attempts` row) that has a date. */
   runs: { repo: string; runId: number; runAttempt: number; createdAt: string }[];
-  /** Each run attempt's `created_at`, by `runKey`. */
+  /**
+   * Each run attempt's `created_at`, by `runKey`; an orphan run's is the stand-in date of `orphanRuns`
+   * in `expire.ts` (its jobs' earliest time).
+   */
   createdAt: Map<string, string>;
 }
 
@@ -59,7 +62,10 @@ export function expiringRuns(held: Held, cutoff: string): Set<string> {
 const jobKey = (repo: string, url: string, runId: number, runAttempt: number) =>
   JSON.stringify([repo, url, runId, runAttempt]);
 
-/** Earliest first: by the run's `created_at`, then run id, then attempt. A run with no attempt row sorts last. */
+/**
+ * Earliest first: by the run's `created_at` (an orphan run's stand-in date), then run id, then attempt.
+ * A run with no date (an orphan with no job time) sorts last.
+ */
 function byRun(held: Held, repo: string): (a: FlakeEvidence, b: FlakeEvidence) => number {
   const at = (e: FlakeEvidence) => held.createdAt.get(runKey(repo, e.runId, e.runAttempt)) ?? "~";
   return (a, b) => {

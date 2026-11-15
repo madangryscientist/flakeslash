@@ -84,7 +84,10 @@ hits three repos is one issue.
     catalogue and are never removed.
   - The expiry runs daily at 03:30 UTC. A run is removed by the first daily run after its creation
     falls before UTC midnight 90 days back. The hourly scan reads only the last 90 days, so a removed
-    run is never read again.
+    run is never read again. A run whose jobs were kept without its attempt (the scan stopped
+    between them, and the run left the window or the repo left the installation before the scan
+    came back) is dated by its jobs' earliest start, or end where none started; one with no time on
+    any job is kept.
   - Before its rows go, each proven job flake with evidence in an expiring run gets a **flake
     record**: the repo, workflow, job and commit, the day of its earliest failed run, links to its
     earliest failed and earliest passed jobs, the issues of its failures, and the failed job's

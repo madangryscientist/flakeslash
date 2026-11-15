@@ -7,7 +7,7 @@ import { testDb } from "#/db/test-db.ts";
 import { ACME, GLOBEX, OTHER, withOrgs } from "#/db/test-store.ts";
 import { capStatements } from "#/scan/d1-cap.ts";
 import { expireAll } from "./daily.ts";
-import { NEW, NOW, OLD, seedRun, seedRuns, tables, wipe } from "./test-seed.ts";
+import { NEW, NOW, OLD, seedOrphan, seedRun, seedRuns, tables, wipe } from "./test-seed.ts";
 
 /**
  * Organisation ACME: two repos, two expiring days and one staying, with 12 flakes on one day so its
@@ -59,6 +59,22 @@ describe("the daily expiry", () => {
     expect(after.dailyTotals).toHaveLength(2);
     expect(lines).toEqual([
       `expired organisation ${GLOBEX}'s runs before 2026-08-17: 0 flake records, 1 days totalled`,
+      `expired organisation ${ACME}'s runs before 2026-08-17: 0 flake records, 1 days totalled`,
+    ]);
+  });
+
+  it("expires an organisation whose only rows before the cutoff are an orphan run", async () => {
+    const db = await withOrgs();
+    await seedRun(db, ACME, { runId: 30, createdAt: NEW, jobs: [{ jobId: 30, startedAt: NEW }] });
+    await seedOrphan(db, ACME, { runId: 10, createdAt: OLD, jobs: [{ jobId: 1, startedAt: OLD }] });
+    const lines: string[] = [];
+
+    await expireAll(env(), { db, now: NOW, log: (line) => lines.push(line) });
+
+    const after = await tables(db);
+    expect(after.jobs).toMatchObject([{ runId: 30 }]);
+    expect(after.dailyTotals).toMatchObject([{ day: "2026-08-16", jobs: 1 }]);
+    expect(lines).toEqual([
       `expired organisation ${ACME}'s runs before 2026-08-17: 0 flake records, 1 days totalled`,
     ]);
   });

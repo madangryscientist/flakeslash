@@ -9,7 +9,7 @@ import type { Db } from "#/db/db.ts";
 import * as schema from "#/db/schema.ts";
 import { capStatements, d1CapOf, isCapReached } from "#/scan/d1-cap.ts";
 import { log as workerLog } from "#/server/log.ts";
-import { expireOrg } from "./expire.ts";
+import { expireOrg, orphanRuns } from "./expire.ts";
 import { cutoffOf } from "./kept.ts";
 
 export interface ExpireDeps {
@@ -22,20 +22,26 @@ export interface ExpireDeps {
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /**
- * The organisations with a run (smoke or not) before `cutoff`, the one whose oldest such run is oldest
- * first. One the cap stopped the run before is first the next day, and one with nothing to expire costs
- * no statement, so no organisation is left behind for good.
+ * The organisations with a run (smoke or not) created before `cutoff`, or an orphan run (`orphanRuns`)
+ * dated before it, the one whose oldest such run is oldest first. One statement: the attempts' dates and
+ * the orphans' dates in a `UNION ALL`. One the cap stopped the run before is first the next day, and one
+ * with nothing to expire costs no statement, so no organisation is left behind for good.
  */
 async function dueOrgs(db: BatchDb, cutoff: string): Promise<number[]> {
   const q: Db = db;
   const { attempts } = schema;
-  const oldest = min(attempts.createdAt);
-  const rows = await q
-    .select({ orgId: attempts.orgId })
+  const orphans = orphanRuns(q, () => undefined, cutoff);
+  const dated = q
+    .select({ orgId: attempts.orgId, createdAt: attempts.createdAt })
     .from(attempts)
     .where(lt(attempts.createdAt, cutoff))
-    .groupBy(attempts.orgId)
-    .orderBy(asc(oldest), asc(attempts.orgId));
+    .unionAll(q.select({ orgId: orphans.orgId, createdAt: orphans.createdAt }).from(orphans))
+    .as("dated");
+  const rows = await q
+    .select({ orgId: dated.orgId })
+    .from(dated)
+    .groupBy(dated.orgId)
+    .orderBy(asc(min(dated.createdAt)), asc(dated.orgId));
   return rows.map((row) => row.orgId);
 }
 

@@ -1,12 +1,12 @@
 /**
  * The expiry of one organisation's detailed rows: a run goes once its `created_at` is before the UTC
- * midnight 90 days back (`cutoffOf`). What people need over time is written first and stays: a flake record
+ * midnight 90 days back (`cutoffOf`). A run with jobs and no `attempts` row is dated by `orphanRuns`. What people need over time is written first and stays: a flake record
  * for each proven flake with evidence in an expiring run, and the daily totals of each expiring day.
  * Every step is idempotent, so a run stopped partway (by D1's statement cap) is finished by the next.
  */
 import { findJobFlakes, followOnJobs } from "@hackcove/flakeslash-engine";
-import { and, eq, lt, not, sql, type SQL } from "drizzle-orm";
-import type { SQLiteColumn } from "drizzle-orm/sqlite-core";
+import { and, eq, isNotNull, lt, not, notExists, or, sql, type SQL } from "drizzle-orm";
+import { alias, type SQLiteColumn } from "drizzle-orm/sqlite-core";
 import type { BatchDb } from "#/db/d1-store.ts";
 import { chunks, runBatch, type Statement } from "#/db/d1-store-shared.ts";
 import type { Db } from "#/db/db.ts";
@@ -35,9 +35,61 @@ import {
   type Held,
 } from "./kept.ts";
 
-/** The organisation's real jobs, failures and run times. */
+const orphanJobs = alias(jobs, "orphan_jobs");
+
+/**
+ * The orphan runs: each (repo, run_id, run_attempt) with job rows and no `attempts` row, which the scan
+ * can no longer complete once the run left its 90-day window or the repo left the installation. Its
+ * stand-in `created_at` is `MIN(COALESCE(started_at, completed_at))` over its jobs; `readHeld`, the
+ * delete and `dueOrgs` all date an orphan by this one rule, so they agree on what expires.
+ *
+ * Accepted inaccuracy: a re-run keeps its run's `created_at` while its jobs start later, so a re-run
+ * orphan is dated a little late. It is kept a little past 90 days, and its flake record and daily
+ * totals land on its jobs' day. That errs toward keeping, and orphans are rare.
+ *
+ * An orphan with no time on any job has no date and is left out, so it is kept indefinitely. An
+ * unfinished attempt is not held, so the scan re-reads it while it is in the window; a finished job
+ * with neither time is possible in principle only, as the parser keeps both nullable.
+ *
+ * `where` filters the jobs (by organisation, by smoke); `before` keeps the orphans dated before it.
+ */
+export function orphanRuns(
+  q: Db,
+  where: (orphan: typeof orphanJobs) => SQL | undefined,
+  before?: string,
+) {
+  const orphan = orphanJobs;
+  const createdAt = sql<string>`MIN(COALESCE(${orphan.startedAt}, ${orphan.completedAt}))`;
+  const attempt = q
+    .select({ one: sql`1` })
+    .from(attempts)
+    .where(
+      and(
+        eq(attempts.orgId, orphan.orgId),
+        eq(attempts.repo, orphan.repo),
+        eq(attempts.runId, orphan.runId),
+        eq(attempts.runAttempt, orphan.runAttempt),
+      ),
+    );
+  return q
+    .select({
+      orgId: orphan.orgId,
+      repo: orphan.repo,
+      runId: orphan.runId,
+      runAttempt: orphan.runAttempt,
+      createdAt: createdAt.as("created_at"),
+    })
+    .from(orphan)
+    .where(and(where(orphan), notExists(attempt)))
+    .groupBy(orphan.orgId, orphan.repo, orphan.runId, orphan.runAttempt)
+    .having(before === undefined ? isNotNull(createdAt) : lt(createdAt, before))
+    .as("orphan_runs");
+}
+
+/** The organisation's real jobs, failures and run times, an orphan run's from `orphanRuns`. */
 async function readHeld(q: Db, orgId: number): Promise<Held> {
-  const [jobRows, failureRows, attemptRows] = await Promise.all([
+  const orphans = orphanRuns(q, (j) => and(eq(j.orgId, orgId), real(j.isSmoke)));
+  const [jobRows, failureRows, attemptRows, orphanRows] = await Promise.all([
     q
       .select()
       .from(jobs)
@@ -55,15 +107,22 @@ async function readHeld(q: Db, orgId: number): Promise<Held> {
       })
       .from(attempts)
       .where(and(eq(attempts.orgId, orgId), real(attempts.isSmoke))),
+    q
+      .select({
+        repo: orphans.repo,
+        runId: orphans.runId,
+        runAttempt: orphans.runAttempt,
+        createdAt: orphans.createdAt,
+      })
+      .from(orphans),
   ]);
+  const runs = [...attemptRows, ...orphanRows];
   return {
     orgId,
     jobs: jobRows.map(jobFromRow),
     failures: failureRows.map(failureFromRow),
-    runs: attemptRows,
-    createdAt: new Map(
-      attemptRows.map((a) => [runKey(a.repo, a.runId, a.runAttempt), a.createdAt]),
-    ),
+    runs,
+    createdAt: new Map(runs.map((a) => [runKey(a.repo, a.runId, a.runAttempt), a.createdAt])),
   };
 }
 
@@ -133,17 +192,24 @@ const onAJob = (commit: SQLiteColumn) =>
 /**
  * Step 4, in one batch so it is all or nothing: the expiring runs' failures, excerpts and model calls,
  * then their jobs, then their attempts, smoke rows too; then each compare neither of whose commits is
- * on a remaining job of its repo.
+ * on a remaining job of its repo. The expiring runs are the attempts created before the cutoff and the
+ * orphan runs (`orphanRuns`) dated before it.
  */
 function deletes(q: Db, orgId: number, cutoff: string): Statement[] {
   const runs = q
     .select({ repo: attempts.repo, runId: attempts.runId, runAttempt: attempts.runAttempt })
     .from(attempts)
     .where(and(eq(attempts.orgId, orgId), lt(attempts.createdAt, cutoff)));
+  const orphans = orphanRuns(q, (j) => eq(j.orgId, orgId), cutoff);
+  const orphanKeys = q
+    .select({ repo: orphans.repo, runId: orphans.runId, runAttempt: orphans.runAttempt })
+    .from(orphans);
+  const runColumns = [jobs.repo, jobs.runId, jobs.runAttempt];
+  const expiring = or(inSet(runColumns, runs), inSet(runColumns, orphanKeys));
   const expiredJobs = q
     .select({ repo: jobs.repo, jobId: jobs.jobId })
     .from(jobs)
-    .where(and(eq(jobs.orgId, orgId), inSet([jobs.repo, jobs.runId, jobs.runAttempt], runs)));
+    .where(and(eq(jobs.orgId, orgId), expiring));
   const ofJobs = (table: typeof failures | typeof excerpts | typeof modelCalls) =>
     q
       .delete(table)
@@ -152,9 +218,7 @@ function deletes(q: Db, orgId: number, cutoff: string): Statement[] {
     ofJobs(failures),
     ofJobs(excerpts),
     ofJobs(modelCalls),
-    q
-      .delete(jobs)
-      .where(and(eq(jobs.orgId, orgId), inSet([jobs.repo, jobs.runId, jobs.runAttempt], runs))),
+    q.delete(jobs).where(and(eq(jobs.orgId, orgId), expiring)),
     q.delete(attempts).where(and(eq(attempts.orgId, orgId), lt(attempts.createdAt, cutoff))),
     q
       .delete(compares)
@@ -164,7 +228,7 @@ function deletes(q: Db, orgId: number, cutoff: string): Statement[] {
   ];
 }
 
-/** Expires one organisation's runs created before the cutoff (`cutoffOf(now)`). */
+/** Expires one organisation's runs created (an orphan's dated) before the cutoff (`cutoffOf(now)`). */
 export async function expireOrg(
   db: BatchDb,
   orgId: number,
