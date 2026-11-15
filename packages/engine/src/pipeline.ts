@@ -17,6 +17,7 @@ import {
 } from "./providers/github-actions.ts";
 import { redact } from "./redact.ts";
 import { signatures } from "./signature.ts";
+import { followOnJobs } from "./follow-on.ts";
 import { findSuspects, type Suspect } from "./suspects.ts";
 import type { Store } from "./store.ts";
 
@@ -58,6 +59,11 @@ export interface RepoScan {
   flakes: JobFlake[];
   /** Failures that look flaky with no proof: the next commit passed and the compare touched no failed file. */
   suspects: Suspect[];
+  /**
+   * The failed jobs that followed another job's failure (`followOnJobs`), as `repo:jobId`. They count as
+   * neither a failure nor a pass for a flake, and their failures are not ranked.
+   */
+  followOn: string[];
 }
 
 /**
@@ -220,8 +226,9 @@ export async function scanRepo(options: ScanRepoOptions): Promise<RepoScan> {
   const logs = await readLogs(options, repo, jobs, cutShort);
   const issues = new Map((await store.readIssues()).map((issue) => [issue.id, issue]));
   const grouped = await groupFailures(store, repo, jobs, issues);
-  const flakes = findJobFlakes(jobs);
   const failures = await store.readFailures();
+  const followOn = followOnJobs(jobs, failures);
+  const flakes = findJobFlakes(jobs, followOn);
   await confirmIssues(store, flakes, issues, failures);
   const named = nameFlakeTests(flakes, failures, [...issues.values()]);
   const suspects = await findSuspects(jobs, failures, (compareRepo, base, head) =>
@@ -240,5 +247,6 @@ export async function scanRepo(options: ScanRepoOptions): Promise<RepoScan> {
     coverage,
     flakes: named,
     suspects,
+    followOn: [...followOn],
   };
 }

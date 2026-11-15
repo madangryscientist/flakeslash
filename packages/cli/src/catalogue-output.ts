@@ -35,6 +35,7 @@ export async function catalogueOf(
     flakes: scans.flatMap((scan) => scan.flakes),
     suspects: scans.flatMap((scan) => scan.suspects),
     now,
+    followOn: new Set(scans.flatMap((scan) => scan.followOn)),
   });
   const coverage = scans.map((scan) => ({ repo: scan.repo, coverage: scan.coverage }));
   return { ranked, excerpts, repos, coverage, now };

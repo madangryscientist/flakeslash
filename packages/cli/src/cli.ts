@@ -70,6 +70,13 @@ ${ISSUE_HELP}
 Exit codes: 0 ok, 1 the run failed (an outage, a refused token), 2 a usage error.
 `;
 
+/** The line for the failed jobs that followed another job's failure. Nothing when there are none. */
+function followOnLines(count: number): string[] {
+  if (count === 0) return [];
+  const jobs = count === 1 ? "job" : "jobs";
+  return [`  followed another job's failure: ${count} failed ${jobs}, not counted`];
+}
+
 function summarize(scan: RepoScan): string {
   const lines = [scan.repo, `  new jobs: ${scan.newJobs}`, `  ${coverageLine(scan.coverage)}`];
   lines.push(`  logs kept: ${scan.logsKept}, expired: ${scan.logsGone}`);
@@ -77,6 +84,7 @@ function summarize(scan: RepoScan): string {
     lines.push(`  ${scan.logsLeft} logs left for the next scan (GitHub said try later)`);
   }
   lines.push(`  new failures: ${scan.newFailures} in ${scan.issuesTouched} issues`);
+  lines.push(...followOnLines(scan.followOn.length));
   if (scan.flakes.length === 0) lines.push("  no flaky jobs");
   else lines.push(`  ${scan.flakes.length} flaky ${scan.flakes.length === 1 ? "job" : "jobs"}:`);
   for (const flake of scan.flakes) {

@@ -197,6 +197,26 @@ describe("findJobFlakes", () => {
 
     expect(flake).toMatchObject({ kind: "job", tests: [] });
   });
+
+  it("counts a follow-on record as neither a failure nor a pass", () => {
+    const failed = (jobId: number) =>
+      job({ runAttempt: jobId, jobId, url: `https://example.test/a${jobId}` });
+    const passed = job({
+      runAttempt: 3,
+      jobId: 3,
+      conclusion: "success",
+      url: "https://example.test/a3",
+    });
+    const followOn = new Set(["acme/app:1"]);
+
+    expect(findJobFlakes([failed(1), passed], followOn)).toEqual([]);
+    expect(findJobFlakes([failed(1), passed])).toHaveLength(1);
+    const kept = findJobFlakes([failed(1), failed(2), passed], followOn);
+    expect(kept[0]?.evidence.map((item) => item.url)).toEqual([
+      "https://example.test/a2",
+      "https://example.test/a3",
+    ]);
+  });
 });
 
 /** A failure of the job at `url`, with the fields the naming reads filled in. */
