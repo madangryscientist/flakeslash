@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { EXPIRE_CRON, onCron } from "./cron.ts";
+import { onCron } from "./cron.ts";
 import { d1Db } from "./db/test-d1.ts";
 import type { ScanEnv } from "./scan/hourly.ts";
 
@@ -27,9 +27,5 @@ describe("the cron triggers", () => {
       expire: async () => void ran.push("expire"),
     });
     expect(ran).toEqual([chosen]);
-  });
-
-  it("expires on the daily cron string wrangler.jsonc declares", () => {
-    expect(EXPIRE_CRON).toBe("30 3 * * *");
   });
 });

@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/d1";
 import type { BatchDb } from "#/db/d1-store.ts";
 import * as schema from "#/db/schema.ts";
 import { d1Db } from "#/db/test-d1.ts";
+import { testDb } from "#/db/test-db.ts";
 import { ACME, GLOBEX, OTHER, withOrgs } from "#/db/test-store.ts";
 import { capStatements } from "#/scan/d1-cap.ts";
 import { expireAll } from "./daily.ts";
@@ -41,10 +42,14 @@ afterAll(() => held?.dispose());
 const env = () => ({ DB: held.d1 });
 
 describe("the daily expiry", () => {
-  it("expires every organisation", async () => {
+  it("expires each organisation with a run to expire, the one with the oldest run first", async () => {
     const db = await withOrgs();
     await seedRun(db, ACME, { runId: 10, createdAt: OLD, jobs: [{ jobId: 1 }] });
-    await seedRun(db, GLOBEX, { runId: 10, createdAt: OLD, jobs: [{ jobId: 1 }] });
+    await seedRun(db, GLOBEX, {
+      runId: 10,
+      createdAt: "2026-08-10T10:00:00Z",
+      jobs: [{ jobId: 1 }],
+    });
     const lines: string[] = [];
 
     await expireAll(env(), { db, now: NOW, log: (line) => lines.push(line) });
@@ -53,9 +58,23 @@ describe("the daily expiry", () => {
     expect(after.jobs).toEqual([]);
     expect(after.dailyTotals).toHaveLength(2);
     expect(lines).toEqual([
-      `expired organisation ${ACME}'s runs before 2026-08-17: 0 flake records, 1 days totalled`,
       `expired organisation ${GLOBEX}'s runs before 2026-08-17: 0 flake records, 1 days totalled`,
+      `expired organisation ${ACME}'s runs before 2026-08-17: 0 flake records, 1 days totalled`,
     ]);
+  });
+
+  it("spends no statement on an organisation with nothing to expire", async () => {
+    let statements = 0;
+    const db = await withOrgs(testDb({ onStatement: () => (statements += 1) }));
+    await seedRun(db, ACME, { runId: 10, createdAt: NEW, jobs: [{ jobId: 1 }] });
+    statements = 0;
+    const lines: string[] = [];
+
+    await expireAll(env(), { db, now: NOW, log: (line) => lines.push(line) });
+
+    expect(lines).toEqual([]);
+    // The one query that finds which organisations have a run to expire.
+    expect(statements).toBe(1);
   });
 });
 

@@ -11,9 +11,8 @@ import {
   type JobRecord,
 } from "@hackcove/flakeslash-engine";
 import type { dailyTotals, flakeRecords } from "#/db/schema.ts";
+import { WINDOW_DAYS } from "#/scan/hourly.ts";
 
-/** Detailed rows stay this many days, counted from the UTC midnight of the day the expiry runs. */
-export const KEEP_DAYS = 90;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** One organisation's real rows, as the expiry reads them. */
@@ -28,7 +27,7 @@ export interface Held {
 }
 
 export type FlakeRecordRow = typeof flakeRecords.$inferInsert;
-export type DailyTotalRow = typeof dailyTotals.$inferInsert;
+type DailyTotalRow = typeof dailyTotals.$inferInsert;
 
 export const runKey = (repo: string, runId: number, runAttempt: number) =>
   JSON.stringify([repo, runId, runAttempt]);
@@ -40,13 +39,13 @@ export const flakeKey = (
 ) => JSON.stringify([row.repo, row.workflow, row.jobName, row.commitSha]);
 
 /**
- * The cutoff day, `YYYY-MM-DD`: UTC midnight `KEEP_DAYS` days before `now`'s day. A run expires when its
+ * The cutoff day, `YYYY-MM-DD`: UTC midnight `WINDOW_DAYS` (the scan's window) days before `now`'s day. A run expires when its
  * `created_at` (GitHub's UTC ISO 8601) sorts before it, which is a text comparison in SQL and here alike.
  */
 export function cutoffOf(now: string): string {
   const midnight = new Date(now);
   midnight.setUTCHours(0, 0, 0, 0);
-  return new Date(midnight.getTime() - KEEP_DAYS * DAY_MS).toISOString().slice(0, 10);
+  return new Date(midnight.getTime() - WINDOW_DAYS * DAY_MS).toISOString().slice(0, 10);
 }
 
 /** The UTC day of an ISO 8601 time in UTC. */

@@ -1,8 +1,8 @@
 /**
- * The daily expiry: `expireOrg` for every organisation, smoke ones too, through one D1 handle capped at
+ * The daily expiry: `expireOrg` for every organisation with a run to expire, smoke ones too, through one D1 handle capped at
  * `D1_STATEMENT_CAP`. On the cap it stops and logs; every step is idempotent, so the next day carries on.
  */
-import { asc } from "drizzle-orm";
+import { asc, lt, min } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import type { BatchDb } from "#/db/d1-store.ts";
 import type { Db } from "#/db/db.ts";
@@ -10,6 +10,7 @@ import * as schema from "#/db/schema.ts";
 import { capStatements, D1_STATEMENT_CAP, isCapReached } from "#/scan/d1-cap.ts";
 import { log as workerLog } from "#/server/log.ts";
 import { expireOrg } from "./expire.ts";
+import { cutoffOf } from "./kept.ts";
 
 export interface ExpireDeps {
   db: BatchDb;
@@ -19,6 +20,24 @@ export interface ExpireDeps {
 }
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+/**
+ * The organisations with a run (smoke or not) before `cutoff`, the one whose oldest such run is oldest
+ * first. One the cap stopped the run before is first the next day, and one with nothing to expire costs
+ * no statement, so no organisation is left behind for good.
+ */
+async function dueOrgs(db: BatchDb, cutoff: string): Promise<number[]> {
+  const q: Db = db;
+  const { attempts } = schema;
+  const oldest = min(attempts.createdAt);
+  const rows = await q
+    .select({ orgId: attempts.orgId })
+    .from(attempts)
+    .where(lt(attempts.createdAt, cutoff))
+    .groupBy(attempts.orgId)
+    .orderBy(asc(oldest), asc(attempts.orgId));
+  return rows.map((row) => row.orgId);
+}
 
 /** `expireOrg`, with a failure other than the cap logged, so the next organisation still runs. */
 async function expireOne(db: BatchDb, orgId: number, now: string, log: ExpireDeps["log"]) {
@@ -39,12 +58,7 @@ export async function expireAll(
   const db = deps.db ?? drizzle(capStatements(env.DB, D1_STATEMENT_CAP), { schema });
   const now = deps.now ?? new Date().toISOString();
   try {
-    const q: Db = db;
-    const orgs = await q
-      .select({ id: schema.organisations.id })
-      .from(schema.organisations)
-      .orderBy(asc(schema.organisations.id));
-    for (const { id } of orgs) await expireOne(db, id, now, log);
+    for (const id of await dueOrgs(db, cutoffOf(now))) await expireOne(db, id, now, log);
   } catch (error) {
     log(
       isCapReached(error)

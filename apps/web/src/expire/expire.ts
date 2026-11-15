@@ -1,6 +1,6 @@
 /**
  * The expiry of one organisation's detailed rows: a run goes once its `created_at` is before the UTC
- * midnight `KEEP_DAYS` days back. What people need over time is written first and stays: a flake record
+ * midnight 90 days back (`cutoffOf`). What people need over time is written first and stays: a flake record
  * for each proven flake with evidence in an expiring run, and the daily totals of each expiring day.
  * Every step is idempotent, so a run stopped partway (by D1's statement cap) is finished by the next.
  */
@@ -34,13 +34,6 @@ import {
   type FlakeRecordRow,
   type Held,
 } from "./kept.ts";
-
-export interface ExpireResult {
-  /** The day before which runs went, `YYYY-MM-DD`. */
-  cutoff: string;
-  records: number;
-  days: number;
-}
 
 /** The organisation's real jobs, failures and run times. */
 async function readHeld(q: Db, orgId: number): Promise<Held> {
@@ -90,17 +83,25 @@ async function readRecords(q: Db, orgId: number): Promise<FlakeRecordRow[]> {
     .where(and(eq(flakeRecords.orgId, orgId), real(flakeRecords.isSmoke)));
 }
 
-/** Step 2: a record for each flake with evidence in an expiring run that has none yet. Chunk by chunk. */
-async function writeRecords(db: BatchDb, held: Held, expiring: Set<string>): Promise<number> {
-  const recorded = new Set((await readRecords(db, held.orgId)).map(flakeKey));
+/**
+ * Step 2: a record for each flake with evidence in an expiring run that has none yet, chunk by chunk.
+ * Returns the records written and the organisation's records as they now are.
+ */
+async function writeRecords(db: BatchDb, held: Held, expiring: Set<string>) {
+  const before = await readRecords(db, held.orgId);
   const flakes = findJobFlakes(held.jobs, followOnJobs(held.jobs, held.failures));
-  const rows = flakeRecordRows(held, flakes, expiring, recorded);
+  const rows = flakeRecordRows(held, flakes, expiring, new Set(before.map(flakeKey)));
   for (const statement of inserts(db, flakeRecords, rows)) await runBatch(db, [statement]);
-  return rows.length;
+  return { written: rows.length, records: [...before, ...rows] };
 }
 
 /** Step 3: each expiring (repo, day) with no totals yet, written whole in one batch. */
-async function writeTotals(db: BatchDb, held: Held, expiring: Set<string>): Promise<number> {
+async function writeTotals(
+  db: BatchDb,
+  held: Held,
+  expiring: Set<string>,
+  records: FlakeRecordRow[],
+): Promise<number> {
   const q: Db = db;
   const totalled = await q
     .selectDistinct({ repo: dailyTotals.repo, day: dailyTotals.day })
@@ -115,8 +116,6 @@ async function writeTotals(db: BatchDb, held: Held, expiring: Set<string>): Prom
       days.set(key, [run.repo, day]);
     }
   }
-  if (days.size === 0) return 0;
-  const records = await readRecords(db, held.orgId);
   for (const [repo, day] of days.values()) {
     await runBatch(db, inserts(db, dailyTotals, dailyTotalRows(held, repo, day, records)));
   }
@@ -165,21 +164,26 @@ function deletes(q: Db, orgId: number, cutoff: string): Statement[] {
   ];
 }
 
-/** Expires one organisation's runs created before UTC midnight `KEEP_DAYS` days before `now`. */
+/** Expires one organisation's runs created before the cutoff (`cutoffOf(now)`). */
 export async function expireOrg(
   db: BatchDb,
   orgId: number,
   now: string,
   log: (line: string) => void,
-): Promise<ExpireResult> {
+): Promise<void> {
   const cutoff = cutoffOf(now);
   const held = await readHeld(db, orgId);
   const expiring = expiringRuns(held, cutoff);
-  const records = expiring.size === 0 ? 0 : await writeRecords(db, held, expiring);
-  const days = expiring.size === 0 ? 0 : await writeTotals(db, held, expiring);
+  let written = 0;
+  let days = 0;
+  if (expiring.size > 0) {
+    const kept = await writeRecords(db, held, expiring);
+    written = kept.written;
+    days = await writeTotals(db, held, expiring, kept.records);
+  }
+  // Smoke rows go too, so this runs with no real run expiring.
   await runBatch(db, deletes(db, orgId, cutoff));
   log(
-    `expired organisation ${orgId}'s runs before ${cutoff}: ${records} flake records, ${days} days totalled`,
+    `expired organisation ${orgId}'s runs before ${cutoff}: ${written} flake records, ${days} days totalled`,
   );
-  return { cutoff, records, days };
 }
