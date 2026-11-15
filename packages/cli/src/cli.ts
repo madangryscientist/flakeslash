@@ -44,7 +44,8 @@ scan explains the failures no known signature recognises, with your own OpenAI-c
 With no endpoint named, nothing is sent anywhere and the summary says explanations are off. Naming
 one means you set the spending cap and both prices; nothing is assumed, and it can never spend past
 the cap. Or, with --model-via claude-code, it asks through the local claude CLI as whoever is
-signed in to it, and the cap counts the cost that CLI reports. One redacted excerpt is sent per
+signed in to it; the cap counts the cost that CLI reports, and since that is known only after a
+call, the last call can pass it. One redacted excerpt is sent per
 unexplained issue (never the log), so a failure repeated 50 times costs one call. The model's answer is stored on the issue; the flake list never depends on it.
 
 Options for scan:

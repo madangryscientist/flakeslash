@@ -132,6 +132,14 @@ describe("createClaudeCodeClient", () => {
         stderr: "",
       },
     ],
+    [
+      "a usage limit in the result with a warning on stderr",
+      {
+        code: 1,
+        stdout: JSON.stringify({ is_error: true, result: "Claude usage limit reached" }),
+        stderr: "warning: an update is available",
+      },
+    ],
   ])("returns stopped for %s and refuses the next call without running claude", async (_n, out) => {
     const { run, seen } = fake([{ ...out, timedOut: false }]);
     const c = client(run);
@@ -148,11 +156,19 @@ describe("createClaudeCodeClient", () => {
     expect(c.stopped).toBeNull();
   });
 
-  it("returns failed when the runner throws", async () => {
-    expect(await call(client(missing))).toMatchObject({
+  it("stops when claude cannot start, and refuses the next call", async () => {
+    let runs = 0;
+    const counted: ClaudeRun = async (...args) => {
+      runs += 1;
+      return missing(...args);
+    };
+    const c = client(counted);
+    expect(await call(c)).toMatchObject({
       ok: false,
-      reason: "failed",
+      reason: "stopped",
       error: "spawn claude ENOENT",
     });
+    expect(await call(c)).toMatchObject({ ok: false, reason: "stopped" });
+    expect(runs).toBe(1);
   });
 });

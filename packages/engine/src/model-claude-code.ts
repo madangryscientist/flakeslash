@@ -16,7 +16,7 @@ export type ClaudeRun = (
 
 export interface ClaudeCodeClientOptions {
   model: string;
-  /** The most the client may spend, in USD, as the CLI reports cost. */
+  /** USD, as the CLI reports cost: no call starts once this much is spent, so the last can pass it. */
   capUsd: number;
   run: ClaudeRun;
   timeoutMs: number;
@@ -76,10 +76,10 @@ function costOf(body: Record<string, unknown> | undefined): number {
   return typeof reported === "number" && Number.isFinite(reported) && reported >= 0 ? reported : 0;
 }
 
-/** Why a call the CLI refused failed: stderr, else the result text, else stdout. */
+/** Why a call the CLI refused failed: the result text and stderr, else stdout. */
 function detailOf(out: RunOut, result: string | undefined): string {
-  const said = out.stderr.trim() === "" ? (result ?? out.stdout) : out.stderr;
-  return `exit ${out.code ?? "none"}: ${said}`;
+  const said = [result, out.stderr.trim()].filter((part) => part !== undefined && part !== "");
+  return `exit ${out.code ?? "none"}: ${said.length === 0 ? out.stdout : said.join(" ")}`;
 }
 
 function readOut(out: RunOut): Reading {
@@ -127,7 +127,10 @@ export function createClaudeCodeClient(options: ClaudeCodeClientOptions): ModelC
     try {
       out = await options.run(args, textOf(messages, "user"), options.timeoutMs);
     } catch (error) {
-      return failed(error instanceof Error ? error.message : String(error));
+      // `claude` could not start (not on PATH, say): every later call would fail the same way.
+      const result = failed(error instanceof Error ? error.message : String(error));
+      stopped = `the claude CLI could not run: ${result.ok ? "" : result.error}`;
+      return { ...result, reason: "stopped" };
     }
     if (out.timedOut) return failed(`timed out after ${options.timeoutMs} ms`);
 

@@ -49,7 +49,8 @@ flakeslash scan owner/repo --model-via claude-code --model claude-haiku-5-5 --ca
 ```
 
 - Each explanation is one `claude -p` call with no tools, no MCP servers and no saved session, run in an empty temporary directory so no project or user settings load.
-- `--cap-usd` counts the cost the CLI reports for each call. That is its own estimate at API prices; on a subscription plan it measures usage, not a bill.
+- `--cap-usd` counts the cost the CLI reports for each call. That is its own estimate at API prices; on a subscription plan it measures usage, not a bill. The cost is known only after a call, so no call starts once the cap is reached, and the last one can go past it.
+- `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` are not passed to `claude`, so it always uses the signed-in account.
 - `--model-url`, `--price-in`, `--price-out` and `FLAKESLASH_MODEL_KEY` are refused with it (exit 2).
 - As with an endpoint, only redacted excerpts of the repos named on that command are sent.
 

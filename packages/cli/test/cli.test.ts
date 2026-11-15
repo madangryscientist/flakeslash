@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import pkg from "../package.json" with { type: "json" };
 import type { FetchLike } from "@hackcove/flakeslash-engine";
 import { run } from "../src/cli.ts";
+import { claudeEnv } from "../src/claude-run.ts";
 import { parseScanArgs } from "../src/scan-args.ts";
 
 describe("run", () => {
@@ -195,5 +196,17 @@ describe("--model-via claude-code", () => {
       write.mockRestore();
     }
     expect(out).toContain("--model-via claude-code");
+  });
+});
+
+describe("the claude runner's environment", () => {
+  it("leaves out an Anthropic key, so claude uses the signed-in account", () => {
+    const env = claudeEnv({
+      PATH: "/bin",
+      ANTHROPIC_API_KEY: "k",
+      ANTHROPIC_AUTH_TOKEN: "t",
+      UNSET: undefined,
+    });
+    expect(env).toEqual({ PATH: "/bin" });
   });
 });
