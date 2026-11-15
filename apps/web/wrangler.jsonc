@@ -18,7 +18,17 @@
       "migrations_dir": "drizzle",
     },
   ],
-  // `CLOUDFLARE_ENV=e2e`: the Playwright build. Bindings are not inherited by an env, so they repeat here.
+  // Sign-in is the GitHub App's user authorization. GITHUB_APP_CLIENT_SECRET and TOKEN_KEY (base64
+  // of 32 random bytes; it seals the GitHub tokens a session keeps) are secrets: `wrangler secret
+  // put`, or `.dev.vars` locally). No value of either is in the tree.
+  "secrets": { "required": ["GITHUB_APP_CLIENT_SECRET", "TOKEN_KEY"] },
+  "vars": {
+    "GITHUB_APP_CLIENT_ID": "",
+    "GITHUB_OAUTH_BASE": "https://github.com",
+    "GITHUB_API_BASE": "https://api.github.com",
+  },
+  // `CLOUDFLARE_ENV=e2e`: the Playwright build. Bindings and vars are not inherited by an env, so they
+  // repeat here. The GitHub bases are GitHub's own until the e2e run has a stand-in for it.
   "env": {
     "e2e": {
       "d1_databases": [
@@ -29,6 +39,12 @@
           "migrations_dir": "drizzle",
         },
       ],
+      "secrets": { "required": ["GITHUB_APP_CLIENT_SECRET", "TOKEN_KEY"] },
+      "vars": {
+        "GITHUB_APP_CLIENT_ID": "",
+        "GITHUB_OAUTH_BASE": "https://github.com",
+        "GITHUB_API_BASE": "https://api.github.com",
+      },
     },
   },
 }

@@ -174,3 +174,36 @@ export const modelCalls = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.orgId, t.repo, t.jobId] })],
 );
+
+/** A person who signed in with GitHub, keyed by their GitHub user id. Refreshed on each sign-in. */
+export const users = sqliteTable("users", {
+  id: integer("id").primaryKey(),
+  login: text("login").notNull(),
+  name: text("name"),
+  avatarUrl: text("avatar_url"),
+  /** ISO 8601. */
+  createdAt: text("created_at").notNull(),
+  isSmoke: isSmoke(),
+});
+
+/**
+ * A signed-in browser. `id` is the SHA-256 hex of the cookie's token, never the token. The GitHub
+ * App's user tokens are sealed (`src/lib/crypto.ts`): they act for the person on GitHub, so they are
+ * never stored or sent anywhere in the clear. Times are ISO 8601.
+ */
+export const sessions = sqliteTable(
+  "sessions",
+  {
+    id: text("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    expiresAt: text("expires_at").notNull(),
+    accessToken: text("access_token").notNull(),
+    accessExpiresAt: text("access_expires_at").notNull(),
+    refreshToken: text("refresh_token").notNull(),
+    refreshExpiresAt: text("refresh_expires_at").notNull(),
+    isSmoke: isSmoke(),
+  },
+  (t) => [index("sessions_by_user").on(t.userId)],
+);

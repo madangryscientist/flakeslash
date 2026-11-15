@@ -76,6 +76,26 @@
   },
   "overrides": [
     {
+      "files": ["apps/web/src/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/db/catalogue*"],
+                "message": "Read catalogue data through src/server/access.ts, which checks what the person may see."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["apps/web/src/server/access.ts", "apps/web/src/db/*.test.ts"],
+      "rules": { "no-restricted-imports": "off" }
+    },
+    {
       "files": ["**/*.test.ts", "**/*.test.tsx", "**/test/**", "e2e/**", "smoke/**"],
       "rules": {
         "typescript/consistent-type-assertions": "off",
