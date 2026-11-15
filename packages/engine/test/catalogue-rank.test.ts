@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   findJobFlakes,
-  latestFailureOf,
   rankIssues,
   type Failure,
   type Issue,
   type JobRecord,
 } from "../src/index.ts";
+import { latestFailureOf } from "../src/catalogue-rank.ts";
 
 const NOW = "2026-12-01T00:00:00Z";
 
