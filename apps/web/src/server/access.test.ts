@@ -130,13 +130,16 @@ describe("repo access", () => {
     expect(row).toBeUndefined();
   });
 
-  test("a spent rate limit is an error, not a repo the person cannot see", async () => {
+  test.each([
+    { name: "with its headers", headers: { "x-ratelimit-remaining": "0" } },
+    { name: "with neither header (a secondary limit)", headers: {} },
+  ])("a spent rate limit $name is an error, not a repo the person cannot see", async (c) => {
     const v = await viewer();
     stubGithub({
       "GET /repos/acme/app": () => ({
         status: 403,
-        body: { message: "API rate limit exceeded" },
-        headers: { "x-ratelimit-remaining": "0" },
+        body: { message: "You have exceeded a secondary rate limit." },
+        headers: c.headers,
       }),
     });
     await expect(access(v, ACME, ["acme/app"], "view")).rejects.toThrow("answered 403");

@@ -62,12 +62,21 @@ async function githubGet(viewer: Viewer, path: string): Promise<unknown> {
     await endSessionById(viewer.db, viewer.sessionId);
     signedIn(null);
   }
-  // A 403 for a spent rate limit is an error to show, not a repo the person cannot see.
-  const limited =
-    res.headers.get("x-ratelimit-remaining") === "0" || res.headers.has("retry-after");
-  if (res.status === 404 || (res.status === 403 && !limited)) return null;
+  if (res.status === 404) return null;
+  // A 403 for a spent rate limit is an error to show, not a repo the person cannot see. GitHub's
+  // secondary limit may send neither header, so its message decides too.
+  if (res.status === 403 && !(await rateLimited(res))) return null;
   if (!res.ok) throw new Error(`GitHub ${path} answered ${res.status}`);
   return res.json();
+}
+
+async function rateLimited(res: Response): Promise<boolean> {
+  if (res.headers.get("x-ratelimit-remaining") === "0" || res.headers.has("retry-after"))
+    return true;
+  const body: unknown = await res.json().catch(() => null);
+  return (
+    isRecord(body) && typeof body["message"] === "string" && /rate limit/i.test(body["message"])
+  );
 }
 
 const NONE: Permissions = { pull: false, push: false };
