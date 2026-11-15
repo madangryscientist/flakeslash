@@ -1,7 +1,7 @@
 # Deploying the dashboard
 
 The dashboard (`apps/web`) is one Cloudflare Worker with a D1 database and two cron triggers: the
-hourly scan and the daily expiry. These steps deploy your own copy. Run every command from `apps/web`
+scan, a batch every 10 minutes, and the daily expiry. These steps deploy your own copy. Run every command from `apps/web`
 after `bun install` at the repo root.
 
 ## Credentials
@@ -108,6 +108,6 @@ whole budget on discovery: past about 99 installations no repo is scanned.
 ## Checking it
 
 Open `https://<host>`: it renders signed out. Sign in with GitHub and install the App on a few repos.
-Each hourly batch scans a few repos, the one scanned longest ago first, so the catalogue fills over
+Each batch (one every 10 minutes) scans a few repos, the one scanned longest ago first, so the catalogue fills over
 the next hours, and a long history takes several batches per repo. Workers Logs (on, through `observability`) show each
 batch's line, and any `exceededCpu` or D1 limit error.

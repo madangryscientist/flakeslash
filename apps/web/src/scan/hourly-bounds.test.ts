@@ -1,12 +1,13 @@
 /**
  * The batch's bounds at the values in `wrangler.jsonc`, sized for Cloudflare's Workers Paid plan: 10,000
- * subrequests and 1,000 D1 queries per invocation (a `db.batch()` counts as one query), 15 minutes of
- * CPU and of wall time for a Cron Trigger. Every batch makes at most `SCAN_REQUEST_BUDGET` GitHub
+ * subrequests and 1,000 D1 queries per invocation (a `db.batch()` counts as one query), 30 seconds of
+ * CPU for a Cron Trigger that runs more often than once an hour, as the scan's (every 10 minutes) does; that
+ * is read from Workers Logs after a deploy. Every batch makes at most `SCAN_REQUEST_BUDGET` GitHub
  * requests and runs at most `SCAN_D1_CAP` D1 statements: the database here refuses the one past the
  * cap, as the Worker's capped handle does. Every statement counts, batched or not, which is stricter
  * than Cloudflare (it counts a batch as one). A batch with nothing new fits under the cap; a batch that
  * reads new logs meets it (each new log costs about four statements), stops there, and the next batch
- * carries on, so a backfill takes more hours but loses nothing.
+ * carries on, so a backfill takes more batches but loses nothing.
  */
 import { readFileSync } from "node:fs";
 import { scanRepo } from "@hackcove/flakeslash-engine";
@@ -14,7 +15,10 @@ import { describe, expect, it } from "vitest";
 import {
   API,
   job,
+  jobsOf,
+  jobsPath,
   json,
+  logPath,
   pullsPath,
   run as runOf,
   runsOf,
@@ -23,9 +27,9 @@ import {
   type Reply,
 } from "../../../../packages/engine/test/github-fake.ts";
 import { d1Store } from "#/db/d1-store.ts";
-import { attempts, jobs } from "#/db/schema.ts";
+import { attempts, excerpts, jobs } from "#/db/schema.ts";
 import { testDb } from "#/db/test-db.ts";
-import { text } from "#/db/test-github.ts";
+import { playwrightLog, text } from "#/db/test-github.ts";
 import { D1CapReached } from "./d1-cap.ts";
 import { runBatch, type BatchDeps } from "./hourly.ts";
 import { APP, appRoutes, failedHistory, installation, stubGitHub } from "./test-app.ts";
@@ -55,11 +59,13 @@ const cap = wranglerVar("SCAN_D1_CAP");
  */
 function counted(routes: Record<string, Reply>, names: string[]) {
   let statements = 0;
+  let writes: string[] = [];
   let limit = Infinity;
   const db = testDb({
-    onStatement: () => {
+    onStatement: (sql) => {
       if (statements >= limit) throw new D1CapReached(limit);
       statements += 1;
+      if (/^\s*(insert|update|delete)\b/i.test(sql)) writes.push(sql);
     },
   });
   const gh = stubGitHub({ ...appRoutes([installation(7, ORG, "acme")]), ...routes }, { 7: names });
@@ -78,11 +84,12 @@ function counted(routes: Record<string, Reply>, names: string[]) {
     gh,
     async batch(overrides: Partial<BatchDeps> = {}) {
       statements = 0;
+      writes = [];
       limit = cap;
       const before = gh.requests();
       try {
         const result = await runBatch(deps(overrides));
-        return { result, requests: gh.requests() - before, statements };
+        return { result, requests: gh.requests() - before, statements, writes };
       } finally {
         limit = Infinity;
       }
@@ -117,6 +124,54 @@ function passingAttempt(repo: string, runId: number, count: number): Record<stri
       headers.link = `<${API}${path}&page=${page + 1}>; rel="next"`;
     }
     routes[pageOf] = new Response(JSON.stringify({ total_count: count, jobs: items }), { headers });
+  }
+  return routes;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * A busy repo's 90 days: `runs` completed runs spread evenly over the 90 days before `now`, run ids
+ * rising with time, one job each. Every 20th run failed and its job's log is kept; the rest passed. The
+ * run listing is newest first, 100 to a page with GitHub's `next` link, so a full listing of 5,700 runs
+ * costs 57 requests.
+ */
+function busyHistory(repo: string, runs: number, now: Date): Record<string, Reply> {
+  const routes: Record<string, Reply> = {};
+  const listed: unknown[] = [];
+  const step = (90 * DAY_MS) / runs;
+  const oldest = now.getTime() - 90 * DAY_MS;
+  for (let n = 0; n < runs; n += 1) {
+    const runId = 100_000 + n;
+    const failed = n % 20 === 19;
+    const conclusion = failed ? "failure" : "success";
+    const createdAt = new Date(oldest + (n + 0.5) * step).toISOString();
+    listed.push(runOf(runId, createdAt, { conclusion }));
+    routes[pullsPath(shaOf(runId), repo)] = json([]);
+    const jobId = runId * 10;
+    routes[jobsPath(runId, 1, repo)] = jobsOf(
+      job(jobId, runId, {
+        conclusion,
+        html_url: `https://github.com/${repo}/actions/runs/${runId}/job/${jobId}`,
+      }),
+    );
+    if (failed) {
+      routes[logPath(jobId, repo)] = text(
+        playwrightLog([`test ${runId}`, `Error: expected ${runId} to be true`]),
+      );
+    }
+  }
+  const newestFirst = listed.toReversed();
+  const pages = Math.ceil(runs / 100);
+  for (let page = 1; page <= pages; page += 1) {
+    const path = runsPath(repo);
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    if (page < pages) headers.link = `<${API}${path}&page=${page + 1}>; rel="next"`;
+    const workflowRuns = newestFirst.slice((page - 1) * 100, page * 100);
+    routes[page === 1 ? path : `${path}&page=${page}`] = new Response(
+      JSON.stringify({ total_count: runs, workflow_runs: workflowRuns }),
+      { headers },
+    );
   }
   return routes;
 }
@@ -166,16 +221,53 @@ describe("the batch's bounds at the values in wrangler.jsonc", () => {
     );
   });
 
+  it("carry a busy repo's 90-day backfill of 5,700 runs to its end", async () => {
+    // Measured: 72 batches, about 11 seconds here. The budget ended the first 70 (200 requests each), the
+    // 71st read the rest (188 requests), and the 72nd scanned the repo and stored nothing new (61
+    // requests: discovery and the 57 pages of the listing). At six batches an hour the backfill is
+    // stored in just under 12 hours. Every batch re-lists the runs from the newest, so later batches
+    // spend more of the budget on the listing and read fewer new runs; the most statements a batch ran
+    // was 589. Over 144 batches (24 hours) the next step would be a resume cursor in the listing.
+    const repo = "acme/busy";
+    const RUNS = 5700;
+    const run = counted(busyHistory(repo, RUNS, hour(0)), [repo]);
+    const stored = async () => {
+      const q = run.db;
+      const rows = [];
+      for (const table of [attempts, jobs, excerpts]) rows.push(await q.$count(table));
+      return rows.join("/");
+    };
+    const seen: { stop: string; requests: number; statements: number }[] = [];
+    for (let n = 0; n < 300; n += 1) {
+      const before = await stored();
+      // The window is held at the first batch's, so no run ages out of the 90 days mid-backfill.
+      const { result, requests, statements } = await run.batch({ now: hour(0) });
+      seen.push({ stop: result.stop, requests, statements });
+      if (result.scanned.some((turn) => turn.name === repo) && (await stored()) === before) break;
+    }
+
+    expect(seen.length).toBeLessThanOrEqual(144);
+    expect(seen.at(-1)?.stop).toBe("all-scanned");
+    expect(Math.max(...seen.map((s) => s.requests))).toBeLessThanOrEqual(budget);
+    expect(Math.max(...seen.map((s) => s.statements))).toBeLessThanOrEqual(cap);
+    expect(await run.db.select().from(attempts)).toHaveLength(RUNS);
+    expect(await run.db.select().from(jobs)).toHaveLength(RUNS);
+    expect(await run.db.select().from(excerpts)).toHaveLength(RUNS / 20);
+  }, 60_000);
+
   it("hold when every repo of a full batch has nothing new", async () => {
     const names = Array.from({ length: reposPerBatch }, (_, n) => `acme/r${n}`);
     const routes = Object.fromEntries(names.map((name) => [runsPath(name), runsOf()]));
     const run = counted(routes, names);
     await run.batch();
-    const { result, requests, statements } = await run.batch({ now: hour(1) });
+    const { result, requests, statements, writes } = await run.batch({ now: hour(1) });
 
     expect(result.scanned).toHaveLength(reposPerBatch);
     expect(result.stop).toBe("all-scanned");
-    // Measured: 23 requests and 183 statements.
+    // Measured: 23 requests and 183 statements, 22 of them writes: discovery's upsert of the organisation
+    // (one row) and its insert of the 20 repos (no row, all held), then the 20 `scanned_at` updates.
+    expect(writes).toHaveLength(22);
+    expect(writes.filter((sql) => sql.startsWith("update"))).toHaveLength(reposPerBatch);
     expect(requests).toBeLessThanOrEqual(budget);
     expect(statements).toBeLessThanOrEqual(cap);
   });
