@@ -117,7 +117,58 @@ function isMatch(line: string): boolean {
   return KEYWORDS.some((keyword) => lower.includes(keyword)) || EXIT_CODE.test(counted);
 }
 
-/** The lines of one step within `CONTEXT` of a match, in order, with a gap marked wherever lines were dropped. */
+/**
+ * Bun's file header, `test/a.test.ts:`, bare or as a `##[group]` or `::group::` line, with moon's
+ * `<target> | ` prefix allowed as in `PASS_LINE`. Bun prints it once, above all of the file's tests.
+ */
+const FILE_LINE =
+  /^\s*(?:\S+ \| )?(?:##\[group\]|::group::)?\S.*?\.(?:test|spec)\.[cm]?[jt]sx?:\s*$/;
+
+/** The end of a group, where a file header above it stops applying. Moon's prefix is allowed. */
+const GROUP_END_LINE = /^\s*(?:\S+ \| )?(?:##\[endgroup\]|::endgroup::)/;
+
+/**
+ * Moon's `<target> | ` prefix, captured, in the shape the signature reader splits streams by. A line
+ * without it belongs to the job's own stream, keyed `""`.
+ */
+const MOON_TARGET = /^\s*([\w@./-]+:[\w.-]+) \|(?: |$)/;
+
+function streamOf(line: string): string {
+  return MOON_TARGET.exec(line)?.[1] ?? "";
+}
+
+/**
+ * Follows, line by line, which file header applies in each stream: the latest one, unless a group
+ * has ended since. Moon interleaves the lines of tasks run at once, so each target is its own stream,
+ * as the signature reader sees it. One pass, so the cut stays linear.
+ */
+function readFileLine(files: Map<string, number>, line: string, index: number): void {
+  if (GROUP_END_LINE.test(line)) files.delete(streamOf(line));
+  else if (FILE_LINE.test(line)) files.set(streamOf(line), index);
+}
+
+/** The file headers for the streams of the matches in the window starting at `index`, in log order. */
+function windowHeaders(
+  step: string[],
+  keep: boolean[],
+  index: number,
+  files: Map<string, number>,
+): string[] {
+  const headers = new Set<number>();
+  for (let i = index; i < step.length && keep[i]; i++) {
+    const line = step[i] ?? "";
+    const header = isMatch(line) ? files.get(streamOf(line)) : undefined;
+    if (header !== undefined) headers.add(header);
+  }
+  return [...headers].toSorted((a, b) => a - b).map((header) => step[header] ?? "");
+}
+
+/**
+ * The lines of one step within `CONTEXT` of a match, in order, with a gap marked wherever lines were
+ * dropped. A window that follows a gap is headed by the file line that applies to it, even when an
+ * earlier window holds that line, because the gap ends the file for whoever reads the cut. A test
+ * failure keeps the name of its file that way.
+ */
 function excerptStep(step: string[]): string[] {
   const keep = step.map(() => false);
   step.forEach((line, index) => {
@@ -128,12 +179,17 @@ function excerptStep(step: string[]): string[] {
   });
 
   const out: string[] = [];
+  const files = new Map<string, number>();
   let previous = -1;
   step.forEach((line, index) => {
-    if (!keep[index]) return;
-    if (index > previous + 1) out.push(GAP);
-    out.push(line);
-    previous = index;
+    if (keep[index]) {
+      if (index > previous + 1) {
+        out.push(GAP, ...windowHeaders(step, keep, index, files));
+      }
+      out.push(line);
+      previous = index;
+    }
+    readFileLine(files, line, index);
   });
   return out;
 }
