@@ -1,4 +1,5 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
+import { useId } from "react";
 import {
   AppShell,
   Button,
@@ -9,6 +10,8 @@ import {
   MetaList,
   Pill,
   Section,
+  SectionHeading,
+  Stack,
   Text,
   TextLink,
 } from "@hackcove/ui-react";
@@ -94,11 +97,13 @@ function OrgSection({ org }: { org: Org }) {
       )}
       {showDismissed && org.dismissed.length > 0 && <Dismissed issues={org.dismissed} />}
       {org.dismissed.length > 0 && (
-        <TextLink
-          render={(p) => <Link to="/" search={showDismissed ? {} : { dismissed: 1 }} {...p} />}
-        >
-          {showDismissed ? "Hide dismissed" : `Show dismissed (${org.dismissed.length})`}
-        </TextLink>
+        <Text as="p">
+          <TextLink
+            render={(p) => <Link to="/" search={showDismissed ? {} : { dismissed: 1 }} {...p} />}
+          >
+            {showDismissed ? "Hide dismissed" : `Show dismissed (${org.dismissed.length})`}
+          </TextLink>
+        </Text>
       )}
     </Section>
   );
@@ -133,13 +138,19 @@ function CandidateRow({ entry, divided }: { entry: CatalogueEntry; divided: bool
 }
 
 function Dismissed({ issues }: { issues: { id: string; name: string }[] }) {
+  const headingId = useId();
   return (
-    <Card flush bar title="Dismissed">
-      {issues.map((issue, index) => (
-        <ListRow key={issue.id} static divided={index > 0}>
-          {issue.name}
-        </ListRow>
-      ))}
-    </Card>
+    <Stack as="section" gap="sm" aria-labelledby={headingId}>
+      <SectionHeading as="h3" id={headingId}>
+        Dismissed
+      </SectionHeading>
+      <Card flush>
+        {issues.map((issue, index) => (
+          <ListRow key={issue.id} static divided={index > 0}>
+            {issue.name}
+          </ListRow>
+        ))}
+      </Card>
+    </Stack>
   );
 }

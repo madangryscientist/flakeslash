@@ -32,13 +32,19 @@ test("each organisation lists its flake candidates in rank order", async ({ page
 test("a dismissed issue is hidden until asked for, then listed by name without a rank", async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
   await signIn(page);
   const acme = section(page, "e2e-acme");
   await expect(acme.getByText(D)).toBeHidden();
+  const orgBox = await acme.boundingBox();
+  const showBox = await acme.getByRole("link", { name: "Show dismissed (1)" }).boundingBox();
+  expect(showBox?.width).toBeLessThan((orgBox?.width ?? 0) / 2);
   await acme.getByRole("link", { name: "Show dismissed (1)" }).click();
   await expect(page).toHaveURL("/?dismissed=1");
 
   const dismissed = acme.getByRole("region", { name: "Dismissed" });
+  await expect(acme.getByRole("heading", { level: 3, name: "Dismissed" })).toBeVisible();
+  await expect(acme.getByRole("heading", { level: 2, name: "Dismissed" })).toHaveCount(0);
   await expect(dismissed.getByText(D)).toBeVisible();
   await expect(dismissed).not.toContainText(/\b[0-9]\b/);
   await expect(acme.getByRole("link", { name: "Hide dismissed" })).toBeVisible();
