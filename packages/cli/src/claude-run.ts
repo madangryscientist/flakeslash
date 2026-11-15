@@ -11,7 +11,7 @@ import type { ClaudeRun } from "@hackcove/flakeslash-engine";
 
 const NOT_PASSED = new Set(["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"]);
 
-/** This process's environment, without what would sign `claude` in as someone else. */
+/** This process's environment, without an Anthropic API key or auth token. */
 export function claudeEnv(
   env: Readonly<Record<string, string | undefined>>,
 ): Record<string, string> {
