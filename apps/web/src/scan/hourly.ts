@@ -13,9 +13,12 @@ import * as schema from "#/db/schema.ts";
 import { createGithubApp, type GithubAppConfig, type GithubFetch } from "#/github/app.ts";
 import { log as workerLog } from "#/server/log.ts";
 import { budgeted, type Budgeted } from "./budget.ts";
-import { discover, message } from "./discover.ts";
+import { capStatements, D1_STATEMENT_CAP } from "./d1-cap.ts";
+import { discover } from "./discover.ts";
 
 const { repos } = schema;
+
+const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /** GitHub keeps Actions logs this long, so a scan reads this far back: that window is the backfill. */
 export const WINDOW_DAYS = 90;
@@ -62,24 +65,38 @@ interface Turn {
  * `scanned_at` first with never-scanned ones before all (SQLite sorts NULL first ascending), then by
  * organisation and name. The token filter runs before the cap, so a dead installation takes no slot.
  */
-async function turns(db: BatchDb, tokens: Map<number, string>, cap: number): Promise<Turn[]> {
+interface Picked {
+  todo: Turn[];
+  /** True when more repos were due than the cap let in. */
+  more: boolean;
+}
+
+async function turns(db: BatchDb, tokens: Map<number, string>, cap: number): Promise<Picked> {
   const q: Db = db;
   const rows = await q
     .select({ orgId: repos.orgId, name: repos.name })
     .from(repos)
     .orderBy(asc(repos.scannedAt), asc(repos.orgId), asc(repos.name));
-  const picked: Turn[] = [];
+  const due: Turn[] = [];
   for (const row of rows) {
     const token = tokens.get(row.orgId);
-    if (token !== undefined) picked.push({ ...row, token });
-    if (picked.length === cap) break;
+    if (token !== undefined) due.push({ ...row, token });
+    if (due.length > cap) break;
   }
-  return picked;
+  return { todo: due.slice(0, cap), more: due.length > cap };
 }
 
-/** Scans one repo; true when a rate limit (real or the budget's) cut it short. A throw is logged. */
+/**
+ * Scans one repo; true when a rate limit (real or the budget's) cut it short. A throw is logged. The
+ * repo takes its turn (goes to the back of the rotation) before the scan, so a scan that ends the
+ * invocation, as D1's statement cap does, has still had it, and one repo never starves the rest.
+ */
 async function scanTurn(deps: BatchDeps, github: Budgeted, turn: Turn, since: string) {
-  let cutShort = false;
+  const q: Db = deps.db;
+  await q
+    .update(repos)
+    .set({ scannedAt: deps.now.toISOString() })
+    .where(and(eq(repos.orgId, turn.orgId), eq(repos.name, turn.name)));
   try {
     const scan = await scanRepo({
       repo: turn.name,
@@ -88,32 +105,27 @@ async function scanTurn(deps: BatchDeps, github: Budgeted, turn: Turn, since: st
       token: turn.token,
       store: d1Store(deps.db, turn.orgId),
     });
-    cutShort = scan.cutShort;
+    return scan.cutShort;
   } catch (error) {
     deps.log(`scan of ${turn.name} failed: ${message(error)}`);
+    return false;
   }
-  // Returned, cut short or thrown, the repo goes to the back of the rotation.
-  const q: Db = deps.db;
-  await q
-    .update(repos)
-    .set({ scannedAt: deps.now.toISOString() })
-    .where(and(eq(repos.orgId, turn.orgId), eq(repos.name, turn.name)));
-  return cutShort;
 }
 
 /** Scans `todo` in order until the budget is spent, a rate limit ends a read, or the list ends. */
-async function scanTurns(deps: BatchDeps, github: Budgeted, todo: Turn[]) {
+async function scanTurns(deps: BatchDeps, github: Budgeted, { todo, more }: Picked) {
   const since = new Date(deps.now.getTime() - WINDOW_DAYS * DAY_MS).toISOString();
   const scanned: BatchResult["scanned"] = [];
   for (const turn of todo) {
     if (github.spent()) return { scanned, stop: "budget" as const };
     const cutShort = await scanTurn(deps, github, turn, since);
     scanned.push({ orgId: turn.orgId, name: turn.name });
-    if (cutShort)
+    if (cutShort) {
       return { scanned, stop: github.spent() ? ("budget" as const) : ("rate-limit" as const) };
+    }
   }
-  if (todo.length === deps.reposPerBatch) return { scanned, stop: "repos" as const };
-  return { scanned, stop: github.spent() ? ("budget" as const) : ("all-scanned" as const) };
+  if (github.spent()) return { scanned, stop: "budget" as const };
+  return { scanned, stop: more ? ("repos" as const) : ("all-scanned" as const) };
 }
 
 /** Runs one batch. Never throws for GitHub's sake; a failed D1 write while scanning does. */
@@ -128,8 +140,8 @@ export async function runBatch(deps: BatchDeps): Promise<BatchResult> {
   const tokens = await discover(db, app, { at: now.toISOString(), log });
   let result: BatchResult = { stop: "no-installations", scanned: [], requests: 0 };
   if (tokens !== null && tokens.size > 0) {
-    const todo = await turns(db, tokens, deps.reposPerBatch);
-    result = { ...(await scanTurns(deps, github, todo)), requests: 0 };
+    const picked = await turns(db, tokens, deps.reposPerBatch);
+    result = { ...(await scanTurns(deps, github, picked)), requests: 0 };
   }
   result.requests = github.used();
   log(
@@ -168,7 +180,7 @@ function depsOf(env: ScanEnv, deps: Partial<BatchDeps>, log: BatchDeps["log"]): 
   const reposPerBatch = deps.reposPerBatch ?? countOf(env.SCAN_REPOS_PER_BATCH);
   if (budget === null || reposPerBatch === null) return null;
   return {
-    db: deps.db ?? drizzle(env.DB, { schema }),
+    db: deps.db ?? drizzle(capStatements(env.DB, D1_STATEMENT_CAP), { schema }),
     fetch: deps.fetch ?? ((input, init) => fetch(input, init)),
     app: deps.app === undefined ? appConfigOf(env) : deps.app,
     budget,

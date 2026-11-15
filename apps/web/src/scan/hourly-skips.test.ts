@@ -6,6 +6,9 @@ import type { Db } from "#/db/db.ts";
 import { repos } from "#/db/schema.ts";
 import { d1Db } from "#/db/test-d1.ts";
 import { testDb } from "#/db/test-db.ts";
+import { drizzle } from "drizzle-orm/d1";
+import * as schema from "#/db/schema.ts";
+import { capStatements } from "./d1-cap.ts";
 import { scheduled, type ScanEnv } from "./hourly.ts";
 import {
   ACME,
@@ -130,6 +133,14 @@ describe("scheduled", () => {
     const held = await q.select({ name: repos.name }).from(repos).where(eq(repos.orgId, 909));
     expect(held).toHaveLength(45);
     expect(lines.at(-1)).toMatch(/stopped: budget$/);
+  });
+
+  it("refuses D1 statements past the batch's cap, batched or not", async () => {
+    const capped = drizzle(capStatements(local.d1, 3), { schema });
+    const one = () => capped.select().from(repos).where(eq(repos.orgId, ACME));
+    await one();
+    await capped.batch([one(), one()]);
+    await expect(one()).rejects.toThrow("the batch reached its cap of 3 D1 statements");
   });
 
   it("leaves the App unconfigured when the id or the key is empty, and never throws", async () => {

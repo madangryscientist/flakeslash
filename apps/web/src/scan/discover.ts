@@ -104,5 +104,3 @@ export async function discover(
   }
   return tokens;
 }
-
-export { message };

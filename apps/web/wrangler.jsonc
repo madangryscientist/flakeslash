@@ -43,6 +43,9 @@
     //   the worst mix, 19 repos with nothing new, then new logs of two failed tests each: 200 requests, 891 statements.
     // 800 and 50 (the first measure) reached 2,400 statements on a batch of log reads, and 300 and
     // 20 reached 1,008 on the worst mix with one test per log (these values: two tests per log).
+    // A log with more distinct failures writes more (a new issue each), which no request budget
+    // bounds, so the batch's D1 handle also refuses statements past D1_STATEMENT_CAP (950,
+    // src/scan/d1-cap.ts): the scan in progress stops there, and the next batch carries on.
     "SCAN_REQUEST_BUDGET": 200,
     "SCAN_REPOS_PER_BATCH": 20,
   },
