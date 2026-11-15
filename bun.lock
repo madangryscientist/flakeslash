@@ -18,8 +18,8 @@
       "name": "@flakeslash/web",
       "dependencies": {
         "@hackcove/flakeslash-engine": "workspace:*",
-        "@hackcove/themes": "0.2.3",
-        "@hackcove/ui-react": "0.10.6",
+        "@hackcove/themes": "^0.2.3",
+        "@hackcove/ui-react": "^0.10.13",
         "@tailwindcss/vite": "^4.3.5",
         "@tanstack/react-router": "1.170.46",
         "@tanstack/react-start": "1.169.5",
@@ -44,7 +44,7 @@
     },
     "packages/cli": {
       "name": "@hackcove/flakeslash",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "bin": {
         "flakeslash": "dist/index.js",
       },
@@ -189,7 +189,7 @@
 
     "@hackcove/themes": ["@hackcove/themes@0.2.3", "", { "peerDependencies": { "tailwindcss": "^4" } }, "sha512-WFprxtjBMfCuHtjsZ4Qc6VLZuvgGAwiktnq988BRAg7EfJ9SOG3XlO2wf//1+RSli63HoSK1tV1No0UQ9XBCew=="],
 
-    "@hackcove/ui-react": ["@hackcove/ui-react@0.10.6", "", { "dependencies": { "@internationalized/date": "^3.12.4", "react-aria-components": "^1.22.1" }, "peerDependencies": { "@types/react": ">=18", "@types/react-dom": ">=18", "react": ">=18", "react-dom": ">=18", "tailwindcss": "^4" }, "optionalPeers": ["@types/react", "@types/react-dom"] }, "sha512-L1AchUp6YPCBA6YiKQnOK4/BEVxY6vOBpK611Xiic1BNmj4txe6jhonzuZP66yDsVk7qu+15eOFjSi9Nm1Pomw=="],
+    "@hackcove/ui-react": ["@hackcove/ui-react@0.10.13", "", { "dependencies": { "@internationalized/date": "^3.12.4", "react-aria-components": "^1.22.1" }, "peerDependencies": { "@types/react": ">=18", "@types/react-dom": ">=18", "react": ">=18", "react-dom": ">=18", "tailwindcss": "^4" }, "optionalPeers": ["@types/react", "@types/react-dom"] }, "sha512-f+ncSTe9ZVLqp7IpX/bPxEqdrb2G3G0dp3GdhJXlyUoyXrLQf/YEOmJ93dmfquNTkEPHky0pgZuYO0LTU3Hjsw=="],
 
     "@img/colour": ["@img/colour@1.1.0", "", {}, "sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ=="],
 
