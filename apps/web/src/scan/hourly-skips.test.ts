@@ -8,7 +8,7 @@ import { d1Db } from "#/db/test-d1.ts";
 import { testDb } from "#/db/test-db.ts";
 import { drizzle } from "drizzle-orm/d1";
 import * as schema from "#/db/schema.ts";
-import { capStatements, D1CapReached } from "./d1-cap.ts";
+import { capStatements, D1_STATEMENT_CAP, d1CapOf, D1CapReached } from "./d1-cap.ts";
 import { scheduled, type ScanEnv } from "./hourly.ts";
 import {
   ACME,
@@ -141,6 +141,16 @@ describe("scheduled", () => {
     await one();
     await capped.batch([one(), one()]);
     await expect(one()).rejects.toThrow("the batch reached its cap of 3 D1 statements");
+  });
+
+  it("takes the D1 cap from SCAN_D1_CAP, and 950 when it is unset or not a positive whole number", () => {
+    expect(d1CapOf({ SCAN_D1_CAP: 45 })).toBe(45);
+    expect(d1CapOf({ SCAN_D1_CAP: "45" })).toBe(45);
+    expect(d1CapOf({})).toBe(D1_STATEMENT_CAP);
+    for (const SCAN_D1_CAP of ["", "lots", 0, -1, 2.5]) {
+      expect(d1CapOf({ SCAN_D1_CAP })).toBe(D1_STATEMENT_CAP);
+    }
+    expect(D1_STATEMENT_CAP).toBe(950);
   });
 
   it("ends the batch at D1's cap as a stop, with the capped repo's turn taken", async () => {

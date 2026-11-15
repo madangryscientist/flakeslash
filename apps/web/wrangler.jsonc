@@ -37,18 +37,19 @@
     "GITHUB_OAUTH_BASE": "https://github.com",
     "GITHUB_API_BASE": "https://api.github.com",
     "GITHUB_APP_ID": "5771126",
-    // One batch's bounds. SCAN_REQUEST_BUDGET counts every GitHub request; SCAN_REPOS_PER_BATCH
-    // bounds the D1 statements, which the request budget does not. Both keep an invocation under
-    // 1,000 subrequests and 1,000 D1 statements (every statement counted, batched or not), measured
-    // in src/scan/hourly-bounds.test.ts at these values:
-    //   a backfill larger than one batch, every log kept: 200 requests, at most 485 statements;
-    //   20 repos with nothing new: 23 requests, 183 statements;
-    //   the worst mix, 19 repos with nothing new, then new logs of two failed tests each: 200 requests, 891 statements.
-    // 800 and 50 (the first measure) reached 2,400 statements on a batch of log reads, and 300 and
-    // 20 reached 1,008 on the worst mix with one test per log (these values: two tests per log).
-    // A log with more distinct failures writes more (a new issue each), which no request budget
-    // bounds, so the batch's D1 handle also refuses statements past D1_STATEMENT_CAP (950,
-    // src/scan/d1-cap.ts): the scan in progress stops there, and the next batch carries on.
+    // One batch's bounds, sized for the free plan (10 ms CPU, 50 subrequests and 50 D1 queries per
+    // invocation). SCAN_REQUEST_BUDGET counts every GitHub request; SCAN_REPOS_PER_BATCH and
+    // SCAN_D1_CAP bound the D1 statements, which the request budget does not: the batch's D1 handle
+    // refuses statements past the cap (src/scan/d1-cap.ts, 950 when unset), the scan in progress
+    // stops there, and the next batch carries on. Measured in src/scan/hourly-bounds.test.ts at these
+    // values, every statement counted (batched or not):
+    //   2 repos with nothing new: 5 requests, 21 statements;
+    //   discovery of an installation with 20 repos, then its first 2: 5 requests, 21 statements;
+    //   a batch that reads new logs (about four statements each) meets the cap: the worst mix, a
+    //   repo with nothing new then one with only logs left, would run 121 uncapped and stops at 45;
+    //   a 40-run backfill over 2 repos lands every log in 9 batches, the cap ending 6 of them.
+    // At budget 20 and 1 repo a log-reading batch still runs 60 to 76 uncapped, so the cap, not a
+    // smaller budget, is what keeps a batch inside the free plan. CPU is read from Workers Logs.
     "SCAN_REQUEST_BUDGET": 30,
     "SCAN_REPOS_PER_BATCH": 2,
     "SCAN_D1_CAP": 45,

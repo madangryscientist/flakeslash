@@ -1,9 +1,11 @@
 /**
  * The batch's bounds at the values in `wrangler.jsonc`, sized for Cloudflare's free plan (50
- * subrequests and 50 D1 queries per invocation): every measured batch makes at most
- * `SCAN_REQUEST_BUDGET` GitHub requests and at most `SCAN_D1_CAP` D1 statements, so the cap never
- * cuts a normal batch. Every statement counts, batched or not, which is stricter than Cloudflare (it
- * counts a batch as one). The database here is uncapped, so a count over the cap shows as a failure.
+ * subrequests and 50 D1 queries per invocation). Every batch makes at most `SCAN_REQUEST_BUDGET`
+ * GitHub requests and runs at most `SCAN_D1_CAP` D1 statements: the database here refuses the one past
+ * the cap, as the Worker's capped handle does. Every statement counts, batched or not, which is
+ * stricter than Cloudflare (it counts a batch as one). A batch with nothing new fits under the cap; a
+ * batch that reads new logs meets it (each new log costs about four statements), stops there, and the
+ * next batch carries on, so a backfill takes more hours but loses nothing.
  */
 import { readFileSync } from "node:fs";
 import { scanRepo } from "@hackcove/flakeslash-engine";
@@ -12,6 +14,7 @@ import { runsOf, runsPath, type Reply } from "../../../../packages/engine/test/g
 import { d1Store } from "#/db/d1-store.ts";
 import { testDb } from "#/db/test-db.ts";
 import { text } from "#/db/test-github.ts";
+import { D1CapReached } from "./d1-cap.ts";
 import { runBatch, type BatchDeps } from "./hourly.ts";
 import { APP, appRoutes, failedHistory, installation, stubGitHub } from "./test-app.ts";
 
@@ -34,10 +37,19 @@ const budget = wranglerVar("SCAN_REQUEST_BUDGET");
 const reposPerBatch = wranglerVar("SCAN_REPOS_PER_BATCH");
 const cap = wranglerVar("SCAN_D1_CAP");
 
-/** A database and a batch runner that counts D1 statements and GitHub requests per batch. */
+/**
+ * A database and a batch runner that counts D1 statements and GitHub requests per batch. In a batch the
+ * database refuses the statement past `cap`; outside one (a test's own setup and reads) it does not.
+ */
 function counted(routes: Record<string, Reply>, names: string[]) {
   let statements = 0;
-  const db = testDb({ onStatement: () => (statements += 1) });
+  let limit = Infinity;
+  const db = testDb({
+    onStatement: () => {
+      if (statements >= limit) throw new D1CapReached(limit);
+      statements += 1;
+    },
+  });
   const gh = stubGitHub({ ...appRoutes([installation(7, ORG, "acme")]), ...routes }, { 7: names });
   const deps = (overrides: Partial<BatchDeps>): BatchDeps => ({
     db,
@@ -54,9 +66,14 @@ function counted(routes: Record<string, Reply>, names: string[]) {
     gh,
     async batch(overrides: Partial<BatchDeps> = {}) {
       statements = 0;
+      limit = cap;
       const before = gh.requests();
-      const result = await runBatch(deps(overrides));
-      return { result, requests: gh.requests() - before, statements };
+      try {
+        const result = await runBatch(deps(overrides));
+        return { result, requests: gh.requests() - before, statements };
+      } finally {
+        limit = Infinity;
+      }
     },
   };
 }
@@ -66,21 +83,24 @@ describe("the batch's bounds at the values in wrangler.jsonc", () => {
     expect({ budget, reposPerBatch, cap }).toEqual({ budget: 30, reposPerBatch: 2, cap: 45 });
   });
 
-  it("hold over a backfill larger than one batch, where every log is kept", async () => {
+  it("carry a backfill larger than one batch to its end, every log kept, the cap ending some batches", async () => {
     const names = ["acme/one", "acme/two"];
     const routes = {
       ...failedHistory("acme/one", { firstRun: 1000, runs: 20, jobsPerRun: 1, testsPerLog: 2 }),
       ...failedHistory("acme/two", { firstRun: 2000, runs: 20, jobsPerRun: 1, testsPerLog: 2 }),
     };
     const run = counted(routes, names);
-    const seen: { requests: number; statements: number }[] = [];
-    for (let n = 0; n < 40; n += 1) {
+    const seen: { stop: string; requests: number; statements: number }[] = [];
+    for (let n = 0; n < 20; n += 1) {
       const { result, requests, statements } = await run.batch({ now: hour(n) });
-      seen.push({ requests, statements });
+      seen.push({ stop: result.stop, requests, statements });
       if (result.stop === "all-scanned") break;
     }
 
-    expect(seen.length).toBeGreaterThan(2);
+    // Measured: 9 batches (30 requests at most, 45 statements at most); the cap ended 6 of them.
+    expect(seen.at(-1)?.stop).toBe("all-scanned");
+    expect(seen.length).toBeLessThanOrEqual(10);
+    expect(seen.filter((s) => s.stop === "d1-cap").length).toBeGreaterThan(0);
     expect(Math.max(...seen.map((s) => s.requests))).toBe(budget);
     expect(Math.max(...seen.map((s) => s.statements))).toBeLessThanOrEqual(cap);
     expect((await d1Store(run.db, ORG).readFailures()).length).toBe(80);
@@ -94,6 +114,8 @@ describe("the batch's bounds at the values in wrangler.jsonc", () => {
     const { result, requests, statements } = await run.batch({ now: hour(1) });
 
     expect(result.scanned).toHaveLength(reposPerBatch);
+    expect(result.stop).toBe("all-scanned");
+    // Measured: 5 requests and 21 statements.
     expect(requests).toBeLessThanOrEqual(budget);
     expect(statements).toBeLessThanOrEqual(cap);
   });
@@ -105,11 +127,13 @@ describe("the batch's bounds at the values in wrangler.jsonc", () => {
     const { result, requests, statements } = await run.batch();
 
     expect(result.scanned).toHaveLength(reposPerBatch);
+    expect(result.stop).toBe("repos");
+    // Measured: 5 requests and 21 statements (the 20 repos go in as one insert).
     expect(requests).toBeLessThanOrEqual(budget);
     expect(statements).toBeLessThanOrEqual(cap);
   });
 
-  it("hold at the worst mix: a full batch of repos, the last one's budget all on logs", async () => {
+  it("hold at the worst mix, a full batch whose last repo has only logs left to read", async () => {
     const small = Array.from(
       { length: reposPerBatch - 1 },
       (_, n) => `acme/r${String(n).padStart(2, "0")}`,
@@ -140,7 +164,21 @@ describe("the batch's bounds at the values in wrangler.jsonc", () => {
 
     const { result, requests, statements } = await run.batch({ now: hour(-1) });
     expect(result.scanned.map((turn) => turn.name).at(-1)).toBe(big);
-    expect(requests).toBe(budget);
+    expect(result.stop).toBe("d1-cap");
+    // Measured: 30 requests, and the cap at 45 statements (uncapped, this batch runs 121).
+    expect(requests).toBeLessThanOrEqual(budget);
     expect(statements).toBeLessThanOrEqual(cap);
+
+    // The batches after it carry on where it stopped, each under the cap, until every log is held.
+    const held = async () => (await d1Store(run.db, ORG).readFailures()).length;
+    let more = 0;
+    while (more < 20 && (await held()) < 80) {
+      const next = await run.batch({ now: hour(more) });
+      expect(next.statements).toBeLessThanOrEqual(cap);
+      more += 1;
+    }
+    // Measured: 6 more batches.
+    expect(await held()).toBe(80);
+    expect(more).toBeLessThanOrEqual(8);
   });
 });
