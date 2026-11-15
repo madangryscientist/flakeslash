@@ -41,7 +41,7 @@ export type RankedEntry = RankedIssue & {
 export interface Ranking {
   ranked: RankedEntry[];
   unranked: number;
-  /** Dismissed issues with a counted failure in the window, in the order the rows give them. */
+  /** Dismissed issues with a failure on a failed job in the window, in the order the rows give them. */
   dismissed: Issue[];
 }
 
@@ -93,7 +93,8 @@ export async function rankCatalogue(rows: RankRows, now: string): Promise<Rankin
     ranked.map((entry) => entry.issue),
   );
   const dismissedRows = rows.issues.filter((issue) => issue.status === "dismissed");
-  const counted = countedIds(input, dismissedRows, rows.jobs);
+  // A dismissed issue shows with any failure on a failed job in the window, a follow-on included.
+  const counted = countedIds({ ...input, followOn: new Set() }, dismissedRows, rows.jobs);
   return {
     ranked: ranked.map((entry) => ({ ...entry, repos: repos.get(entry.issue.id) ?? [] })),
     unranked,
