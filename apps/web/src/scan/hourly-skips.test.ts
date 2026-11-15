@@ -167,6 +167,12 @@ describe("scheduled", () => {
     cap = Infinity;
     const next = await batch(db, gh.fetch, { now: at(2) }).done;
     expect(next.scanned[0]?.name).not.toBe(result.scanned[0]?.name);
+
+    // A cap that lands on the turn's own write: the repo is not reported as scanned, and keeps its place.
+    statements = 0;
+    cap = 3;
+    const untaken = await batch(db, gh.fetch, { now: at(3) }).done;
+    expect(untaken).toMatchObject({ stop: "d1-cap", scanned: [] });
   });
 
   it("leaves the App unconfigured when the id or the key is empty, and never throws", async () => {

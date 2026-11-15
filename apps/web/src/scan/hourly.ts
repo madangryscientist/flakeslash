@@ -89,7 +89,8 @@ async function turns(db: BatchDb, tokens: Map<number, string>, cap: number): Pro
 
 /**
  * Scans one repo: "cut" when a rate limit (real or the budget's) cut it short, "cap" when D1's statement
- * cap stopped it, else "done". Any other throw is logged. The
+ * cap stopped it ("cap-before-turn" when that was before the turn was taken, so nothing was read), else
+ * "done". Any other throw is logged. The
  * repo takes its turn (goes to the back of the rotation) before the scan, so a scan that ends the
  * invocation, as D1's statement cap does, has still had it, and one repo never starves the rest.
  */
@@ -98,7 +99,7 @@ async function scanTurn(
   github: Budgeted,
   turn: Turn,
   since: string,
-): Promise<"done" | "cut" | "cap"> {
+): Promise<"done" | "cut" | "cap" | "cap-before-turn"> {
   const q: Db = deps.db;
   let turnTaken = false;
   try {
@@ -116,7 +117,7 @@ async function scanTurn(
     });
     return scan.cutShort ? "cut" : "done";
   } catch (error) {
-    if (isCapReached(error)) return "cap";
+    if (isCapReached(error)) return turnTaken ? "cap" : "cap-before-turn";
     // Any other failure to take the turn is D1's, and ends the batch (`scheduled` logs it).
     if (!turnTaken) throw error;
     deps.log(`scan of ${turn.name} failed: ${message(error)}`);
@@ -131,6 +132,7 @@ async function scanTurns(deps: BatchDeps, github: Budgeted, { todo, more }: Pick
   for (const turn of todo) {
     if (github.spent()) return { scanned, stop: "budget" as const };
     const ended = await scanTurn(deps, github, turn, since);
+    if (ended === "cap-before-turn") return { scanned, stop: "d1-cap" as const };
     scanned.push({ orgId: turn.orgId, name: turn.name });
     if (ended === "cap") return { scanned, stop: "d1-cap" as const };
     if (ended === "cut") {
