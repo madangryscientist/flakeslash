@@ -2,14 +2,7 @@
  * The FlakeSlash engine: flake detection. It reads a repo's GitHub Actions history, keeps it in a
  * `Store` and decides which jobs are flaky. The CLI and the web app import from here.
  */
-export const ENGINE_NAME = "flakeslash-engine";
-
-export const ENGINE_VERSION = "0.0.0";
-
-/** What the engine is, in one line, for `--version` and logs. */
-export function describeEngine(): string {
-  return `${ENGINE_NAME} ${ENGINE_VERSION}`;
-}
+export { describeEngine, ENGINE_NAME, ENGINE_VERSION } from "./describe.ts";
 
 export { type Explanation, type Failure, type Issue, type IssueSignature } from "./catalogue.ts";
 
