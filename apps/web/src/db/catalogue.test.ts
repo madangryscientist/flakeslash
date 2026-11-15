@@ -1,6 +1,7 @@
 import type { DrizzleD1Database } from "drizzle-orm/d1";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { readFailures, readIssues } from "./catalogue.ts";
+import * as schema from "./schema.ts";
 import { failures, issues, organisations } from "./schema.ts";
 import { testDb } from "./test-db.ts";
 
@@ -71,7 +72,7 @@ describe("readFailures", () => {
 
 describe("the data layer's handle", () => {
   it("takes the D1 database production passes, not only the test proxy", () => {
-    expectTypeOf<DrizzleD1Database>().toExtend<Parameters<typeof readIssues>[0]>();
-    expectTypeOf<DrizzleD1Database>().toExtend<Parameters<typeof readFailures>[0]>();
+    expectTypeOf<DrizzleD1Database<typeof schema>>().toExtend<Parameters<typeof readIssues>[0]>();
+    expectTypeOf<DrizzleD1Database<typeof schema>>().toExtend<Parameters<typeof readFailures>[0]>();
   });
 });
