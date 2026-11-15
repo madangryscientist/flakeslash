@@ -37,25 +37,26 @@
     "GITHUB_OAUTH_BASE": "https://github.com",
     "GITHUB_API_BASE": "https://api.github.com",
     "GITHUB_APP_ID": "5771126",
-    // One batch's bounds, sized for the free plan (10 ms CPU and 50 subrequests per invocation, a D1
-    // query counting as one and a batch of statements as one query). SCAN_REQUEST_BUDGET counts every GitHub request; SCAN_REPOS_PER_BATCH and
-    // SCAN_D1_CAP bound the D1 statements, which the request budget does not: the batch's D1 handle
-    // refuses statements past the cap (src/scan/d1-cap.ts, 950 when unset), the scan in progress
-    // stops there, and the next batch carries on. Measured in src/scan/hourly-bounds.test.ts at these
-    // values, every statement counted (batched or not):
-    //   2 repos with nothing new: 5 requests, 21 statements;
-    //   discovery of an installation with 20 repos, then its first 2: 5 requests, 21 statements;
-    //   a batch that reads new logs (about four statements each) meets the cap: the worst mix, a
-    //   repo with nothing new then one with only logs left, would run 121 uncapped and stops at 45;
-    //   a 40-run backfill over 2 repos lands every log in 9 batches, the cap ending 6 of them.
-    // At budget 20 and 1 repo a log-reading batch still runs 60 to 76 uncapped, so the cap, not a
-    // smaller budget, is what bounds a log-reading batch. GitHub requests and D1 queries share the 50:
-    // a capped batch can pass it, so the live check reads Workers Logs for that and for CPU.
-    // Discovery runs first, two requests and two statements per installation: past about 14
-    // installations it spends the whole budget.
-    "SCAN_REQUEST_BUDGET": 30,
-    "SCAN_REPOS_PER_BATCH": 2,
-    "SCAN_D1_CAP": 45,
+    // One batch's bounds, sized for Workers Paid: 10,000 subrequests and 1,000 D1 queries per invocation
+    // (a db.batch() counts as one query), 15 minutes of CPU and of wall time for a Cron Trigger.
+    // SCAN_REQUEST_BUDGET counts every GitHub request. SCAN_REPOS_PER_BATCH and SCAN_D1_CAP bound the
+    // D1 statements, which the request budget does not: the batch's D1 handle refuses a statement past
+    // the cap (src/scan/d1-cap.ts, 950 when unset), counting every statement, batched or not, which is
+    // stricter than Cloudflare's count of a batch as one. The scan in progress stops there, and the next
+    // batch carries on. Measured in src/scan/hourly-bounds.test.ts at these values:
+    //   20 repos with nothing new: 23 requests, 183 statements;
+    //   discovery of an installation with 21 repos, then its first 20: 23 requests, 184 statements;
+    //   a batch that reads new logs meets the cap: 160 runs of logs left (three tests a log) run 983
+    //   statements uncapped, and stop at 950 with 183 requests;
+    //   a backfill of 200 runs in each of 2 repos lands every log in 7 batches, the budget ending 6;
+    //   one passing attempt of 1,000 jobs is written in full in 15 requests and 213 statements; a probe
+    //   run outside the suite puts the most one attempt fitting a batch at 4,680 jobs (949 statements).
+    // GitHub requests and D1 queries together stay far under the 10,000 subrequests, so the live check
+    // reads Workers Logs for CPU and the request count. Discovery runs first, two requests and two
+    // statements per installation: past about 99 installations it spends the whole budget.
+    "SCAN_REQUEST_BUDGET": 200,
+    "SCAN_REPOS_PER_BATCH": 20,
+    "SCAN_D1_CAP": 950,
   },
   // `CLOUDFLARE_ENV=e2e`: the Playwright build. Bindings and vars are not inherited by an env, so they
   // repeat here. The Playwright run's `vite.config.ts` points the GitHub bases at its stand-in
@@ -76,9 +77,9 @@
         "GITHUB_OAUTH_BASE": "https://github.com",
         "GITHUB_API_BASE": "https://api.github.com",
         "GITHUB_APP_ID": "",
-        "SCAN_REQUEST_BUDGET": 30,
-        "SCAN_REPOS_PER_BATCH": 2,
-        "SCAN_D1_CAP": 45,
+        "SCAN_REQUEST_BUDGET": 200,
+        "SCAN_REPOS_PER_BATCH": 20,
+        "SCAN_D1_CAP": 950,
       },
     },
   },

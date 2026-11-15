@@ -93,14 +93,18 @@ The dashboard is live at https://flakeslash.slashslash.build, a custom domain on
 `apps/web/wrangler.jsonc`, with the production D1 database's id at its top level (`env.e2e` keeps a
 placeholder). [`docs/deploying.md`](docs/deploying.md) has the deploy steps.
 
-- **It runs on Cloudflare's free plan**: 10 ms of CPU and 50 subrequests per invocation, where a D1
-  query counts as a subrequest (a batch of statements as one). The hourly scan's vars are sized for
-  it: `SCAN_REQUEST_BUDGET` 30, `SCAN_REPOS_PER_BATCH` 2 and `SCAN_D1_CAP` 45. A batch that reads new
-  logs meets the cap and the next one carries on; `src/scan/hourly-bounds.test.ts` measures each case,
-  and the comment above the vars has the counts. GitHub requests and D1 queries together can pass 50
-  on a log-reading batch, and CPU cannot be measured locally: both are read from Workers Logs.
+- **It runs on Cloudflare's Workers Paid plan**: 10,000 subrequests and 1,000 D1 queries per
+  invocation (a `db.batch()` counts as one query), 15 minutes of CPU and of wall time for a Cron
+  Trigger. The hourly scan's vars are sized for it: `SCAN_REQUEST_BUDGET` 200, `SCAN_REPOS_PER_BATCH`
+  20 and `SCAN_D1_CAP` 950, where the cap counts every statement, batched or not. A batch that reads
+  new logs meets the cap and the next one carries on; `src/scan/hourly-bounds.test.ts` measures each
+  case, and the comment above the vars has the counts. CPU and the live subrequest count cannot be
+  measured locally: both are read from Workers Logs.
+- **D1 writes are billed** ($1 per million rows written past the monthly allowance Workers Paid
+  includes, per Cloudflare's D1 pricing). A change that
+  writes more rows per scan says how many in its PR.
 - **Discovery runs first in every batch**: two GitHub requests and two D1 statements per installation.
-  Past about 14 installations it spends the whole request budget and no repo is scanned.
+  Past about 99 installations it spends the whole request budget and no repo is scanned.
 - **Credentials come from the environment**: wrangler reads `CLOUDFLARE_API_TOKEN` and
   `CLOUDFLARE_ACCOUNT_ID`. There is no `wrangler login`.
 - **The GitHub App's secrets are set on the Worker** with `wrangler secret put`
