@@ -28,7 +28,9 @@
     "GITHUB_API_BASE": "https://api.github.com",
   },
   // `CLOUDFLARE_ENV=e2e`: the Playwright build. Bindings and vars are not inherited by an env, so they
-  // repeat here. The GitHub bases are GitHub's own until the e2e run has a stand-in for it.
+  // repeat here. The Playwright run's `vite.config.ts` points the GitHub bases at its stand-in
+  // (`e2e/github-stub.ts`) and sets the client secret and TOKEN_KEY as test vars, so they are not
+  // required secrets here: a var and a secret of one name clash.
   "env": {
     "e2e": {
       "d1_databases": [
@@ -39,7 +41,6 @@
           "migrations_dir": "drizzle",
         },
       ],
-      "secrets": { "required": ["GITHUB_APP_CLIENT_SECRET", "TOKEN_KEY"] },
       "vars": {
         "GITHUB_APP_CLIENT_ID": "",
         "GITHUB_OAUTH_BASE": "https://github.com",
