@@ -39,6 +39,20 @@ One pick that was tested is `gpt-6-luna` on the opencode-go endpoint, at about $
 export FLAKESLASH_MODEL_HEADERS='x-opencode-session: any-id-you-like'
 ```
 
+### Through the local claude CLI
+
+`--model-via claude-code` asks the model through the `claude` CLI on your machine instead of an endpoint. It uses whoever is signed in to that CLI, so it needs no key and no prices: pass the model and the cap only.
+
+```bash
+export GITHUB_TOKEN=...
+flakeslash scan owner/repo --model-via claude-code --model claude-haiku-5-5 --cap-usd 0.2
+```
+
+- Each explanation is one `claude -p` call with no tools, no MCP servers and no saved session, run in an empty temporary directory so no project or user settings load.
+- `--cap-usd` counts the cost the CLI reports for each call. That is its own estimate at API prices; on a subscription plan it measures usage, not a bill.
+- `--model-url`, `--price-in`, `--price-out` and `FLAKESLASH_MODEL_KEY` are refused with it (exit 2).
+- As with an endpoint, only redacted excerpts of the repos named on that command are sent.
+
 ## Correcting the catalogue
 
 A scan groups failures into issues by itself. When it gets one wrong, you correct that one entry, and the correction survives every later scan:

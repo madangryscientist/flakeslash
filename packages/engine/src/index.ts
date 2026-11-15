@@ -55,6 +55,12 @@ export {
   type ModelResult,
 } from "./model.ts";
 
+export {
+  createClaudeCodeClient,
+  type ClaudeCodeClientOptions,
+  type ClaudeRun,
+} from "./model-claude-code.ts";
+
 export type { ReadAttempt } from "./providers/github-attempt.ts";
 
 export { isRunner } from "./providers/github-runner.ts";

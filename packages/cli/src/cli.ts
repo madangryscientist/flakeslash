@@ -1,12 +1,15 @@
 import {
+  createClaudeCodeClient,
   createModelClient,
   describeEngine,
   explainIssues,
   GitHubApiError,
   scanRepo,
+  type ModelClient,
   type RankedIssue,
   type RepoScan,
 } from "@hackcove/flakeslash-engine";
+import { CLAUDE_TIMEOUT_MS, runClaude } from "./claude-run.ts";
 import pkg from "../package.json" with { type: "json" };
 import { coverageLine } from "./coverage-line.ts";
 import { catalogueJson, catalogueOf, writeReportFile } from "./catalogue-output.ts";
@@ -15,7 +18,7 @@ import { summarizeExplanations, type Explanations } from "./explanations.ts";
 import { suspectLines } from "./suspect-lines.ts";
 import { ISSUE_HELP, ISSUE_USAGE, issueCommand } from "./issue.ts";
 import { nameScans, testText } from "./flake-tests.ts";
-import { parseScanArgs, type Deps, type ScanArgs } from "./scan-args.ts";
+import { parseScanArgs, type Deps, type ModelConfig, type ScanArgs } from "./scan-args.ts";
 import { openSqliteStore } from "./store.ts";
 import { UsageError } from "./usage-error.ts";
 
@@ -25,6 +28,7 @@ Usage:
   flakeslash scan <owner/repo>... [--since <date>] [--store <path>] [--json]
                          list the jobs that both failed and passed on one commit
                          [--model-url <url> --model <name> --cap-usd <n> --price-in <n> --price-out <n>]
+                         [--model-via claude-code --model <name> --cap-usd <n>]
 ${ISSUE_USAGE}  flakeslash --version   print the version
   flakeslash --help      print this help
 
@@ -39,8 +43,9 @@ store: the issues ranked by commits in the last 30 days, each with its flake rat
 scan explains the failures no known signature recognises, with your own OpenAI-compatible endpoint.
 With no endpoint named, nothing is sent anywhere and the summary says explanations are off. Naming
 one means you set the spending cap and both prices; nothing is assumed, and it can never spend past
-the cap. One redacted excerpt is sent per unexplained issue (never the log), so a failure repeated
-50 times costs one call. The model's answer is stored on the issue; the flake list never depends on it.
+the cap. Or, with --model-via claude-code, it asks through the local claude CLI as whoever is
+signed in to it, and the cap counts the cost that CLI reports. One redacted excerpt is sent per
+unexplained issue (never the log), so a failure repeated 50 times costs one call. The model's answer is stored on the issue; the flake list never depends on it.
 
 Options for scan:
   --since <date>   read runs created on or after this date (default: 90 days ago)
@@ -51,6 +56,9 @@ Options for scan:
   --cap-usd <n>       the most to spend, in USD, above 0 (needed with --model-url)
   --price-in <n>      USD per million prompt tokens, 0 or more (needed with --model-url)
   --price-out <n>     USD per million completion tokens, 0 or more (needed with --model-url)
+  --model-via claude-code
+                      ask through the local claude CLI instead of an endpoint; needs --model and
+                      --cap-usd, and refuses --model-url, the prices and FLAKESLASH_MODEL_KEY
 
 Environment for scan:
   FLAKESLASH_MODEL_URL      the same as --model-url (the flag wins)
@@ -128,6 +136,20 @@ function readScanArgs(
   }
 }
 
+/** The model client the config names: the endpoint's, or the local `claude` CLI's. */
+function clientOf(config: ModelConfig, deps: Deps): ModelClient {
+  if (config.via === "claude-code") {
+    return createClaudeCodeClient({
+      model: config.model,
+      capUsd: config.capUsd,
+      run: deps.claudeRun ?? runClaude,
+      timeoutMs: CLAUDE_TIMEOUT_MS,
+    });
+  }
+  const { via: _via, ...http } = config;
+  return createModelClient({ ...http, fetch: deps.modelFetch ?? globalThis.fetch });
+}
+
 /** Scans every repo, then (if a model is named) explains what is left, then ranks the issues. */
 async function scanAll(
   { options, token }: { options: ScanArgs; token: string },
@@ -141,10 +163,7 @@ async function scanAll(
       scans.push(await scanRepo({ repo, since: options.since, fetch: deps.fetch, token, store }));
     }
     if (options.model !== undefined) {
-      const client = createModelClient({
-        ...options.model,
-        fetch: deps.modelFetch ?? globalThis.fetch,
-      });
+      const client = clientOf(options.model, deps);
       const explain = { store, client, model: options.model.model, repos: options.repos };
       const result = await explainIssues(explain);
       explanations.result = result;
