@@ -1,5 +1,5 @@
 /**
- * The hourly scan. Installing the App is enough: there is no webhook. Each run finds the App's
+ * The scan, a batch every 10 minutes. Installing the App is enough: there is no webhook. Each run finds the App's
  * installations, records their repos, and scans the repos that waited longest, within a bound on GitHub
  * requests and on repos. The store is the cursor: a scan fetches only what the store does not hold, so a
  * new installation's 90 days of history fill over several batches, and later ones pick up new failures.

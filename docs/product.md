@@ -14,13 +14,14 @@ It is source-available under the Elastic License 2.0 and self-hostable. This fil
   only. A job is never analysed twice, and a scan stops at its spending cap and reports what it
   covered.
 - **The GitHub App, for the dashboard.** Installing the App is enough. There is no webhook: a scan runs
-  every hour, finds new installations by itself, records their accounts and repos, and scans them. A
-  new failure usually shows up within an hour. That holds while an organisation's repos fit one batch,
+  every 10 minutes, finds new installations by itself, records their accounts and repos, and scans them. A
+  new failure usually shows up within 10 minutes. That holds while an organisation's repos fit one batch,
   both in count (`SCAN_REPOS_PER_BATCH`) and in GitHub requests (`SCAN_REQUEST_BUDGET`, which every
   scan's re-listing of 90 days of runs draws on). Beyond that, repos take turns, the one scanned
   longest ago first.
   - A new installation's first scan reads back 90 days, which is how long GitHub keeps Actions logs.
-    A big backfill fills over several hourly batches: each batch stops at its bounds, and the next one
+    A big backfill fills over several batches (a repo with about 5,700 runs in 90 days takes about 12
+    hours): each batch stops at its bounds, and the next one
     carries on from what is already stored.
   - The App asks for every permission it will need now, so an installed organisation never has to
     approve it again: Actions read, Contents read (for `CODEOWNERS` and compares), Checks write (for
@@ -83,7 +84,7 @@ hits three repos is one issue.
     calls. A compare goes once neither of its commits is on a job still held. The issues are the
     catalogue and are never removed.
   - The expiry runs daily at 03:30 UTC. A run is removed by the first daily run after its creation
-    falls before UTC midnight 90 days back. The hourly scan reads only the last 90 days, so a removed
+    falls before UTC midnight 90 days back. The scan reads only the last 90 days, so a removed
     run is never read again. A run whose jobs were kept without its attempt (the scan stopped
     between them, and the run left the window or the repo left the installation before the scan
     came back) is dated by its jobs' earliest start, or end where none started; one with no time on

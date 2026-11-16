@@ -22,23 +22,25 @@
   // Sign-in is the GitHub App's user authorization. GITHUB_APP_CLIENT_SECRET and TOKEN_KEY (base64
   // of 32 random bytes; it seals the GitHub tokens a session keeps) are secrets: `wrangler secret
   // put`, or `.dev.vars` locally). No value of either is in the tree.
-  // GITHUB_APP_PRIVATE_KEY is the App's own key, for the hourly scan (a secret too). GITHUB_APP_ID
+  // GITHUB_APP_PRIVATE_KEY is the App's own key, for the scan (a secret too). GITHUB_APP_ID
   // and GITHUB_APP_CLIENT_ID are public; with the id or the key empty, the scan logs one line and
   // calls nothing.
   "secrets": {
     "required": ["GITHUB_APP_CLIENT_SECRET", "TOKEN_KEY", "GITHUB_APP_PRIVATE_KEY"],
   },
-  // The hourly scan (src/scan/hourly.ts): no webhook, each run finds new installations itself. The
-  // daily expiry at 03:30 UTC (src/expire/daily.ts) removes detailed rows past 90 days. src/cron.ts
-  // picks the job by the cron string, so a change here changes EXPIRE_CRON there too.
-  "triggers": { "crons": ["0 * * * *", "30 3 * * *"] },
+  // The scan (src/scan/hourly.ts) runs a batch every 10 minutes: no webhook, each run finds new
+  // installations itself. Its minutes are offset by 5 (:05, :15 and on) so no batch starts in the same
+  // minute as the daily expiry at 03:30 UTC (src/expire/daily.ts), which removes detailed rows past 90
+  // days. src/cron.ts picks the job by the cron string, so a change here changes EXPIRE_CRON there too.
+  "triggers": { "crons": ["5,15,25,35,45,55 * * * *", "30 3 * * *"] },
   "vars": {
     "GITHUB_APP_CLIENT_ID": "Iv23liA7FCdQbymsYJy5",
     "GITHUB_OAUTH_BASE": "https://github.com",
     "GITHUB_API_BASE": "https://api.github.com",
     "GITHUB_APP_ID": "5771126",
     // One batch's bounds, sized for Workers Paid: 10,000 subrequests and 1,000 D1 queries per invocation
-    // (a db.batch() counts as one query), 15 minutes of CPU and of wall time for a Cron Trigger.
+    // (a db.batch() counts as one query), and 30 seconds of CPU for a Cron Trigger that runs more often
+    // than once an hour, as this one does (read from Workers Logs after a deploy).
     // SCAN_REQUEST_BUDGET counts every GitHub request. SCAN_REPOS_PER_BATCH and SCAN_D1_CAP bound the
     // D1 statements, which the request budget does not: the batch's D1 handle refuses a statement past
     // the cap (src/scan/d1-cap.ts, 950 when unset), counting every statement, batched or not, which is
@@ -49,6 +51,8 @@
     //   a batch that reads new logs meets the cap: 160 runs of logs left (three tests a log) run 983
     //   statements uncapped, and stop at 950 with 183 requests;
     //   a backfill of 200 runs in each of 2 repos lands every log in 7 batches, the budget ending 6;
+    //   a busy repo's 90 days (5,700 runs, every 20th failed) is stored in 71 batches, just under 12
+    //   hours at six batches an hour, and the 72nd finds nothing new;
     //   one passing attempt of 1,000 jobs is written in full in 15 requests and 213 statements; a probe
     //   run outside the suite puts the most one attempt fitting a batch at 4,680 jobs (949 statements).
     // GitHub requests and D1 queries together stay far under the 10,000 subrequests, so the live check

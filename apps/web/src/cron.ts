@@ -10,7 +10,7 @@ export interface CronDeps {
   expire?: () => Promise<void>;
 }
 
-/** Runs the expiry on `EXPIRE_CRON` and the hourly scan on any other cron. */
+/** Runs the expiry on `EXPIRE_CRON` and the scan (every 10 minutes) on any other cron. */
 export async function onCron(cron: string, env: ScanEnv, deps: CronDeps = {}): Promise<void> {
   if (cron === EXPIRE_CRON) await (deps.expire ?? (() => expireAll(env)))();
   else await (deps.scan ?? (() => scheduled(env)))();
