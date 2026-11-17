@@ -107,6 +107,15 @@ whole budget on discovery: past about 99 installations no repo is scanned.
 
 ## Checking it
 
+After each production deploy, check the live commit from the repo checkout you deployed:
+
+```bash
+SMOKE_BASE_URL=https://<host> SMOKE_EXPECT_COMMIT=$(git rev-parse HEAD) bun run playwright test --project smoke
+```
+
+The home page's hidden `build-commit` meta has to name that commit. The smoke retries for two minutes while
+the edge catches up. A failure names the commit the page carries. Use the deployed sha if it differs from HEAD.
+
 Open `https://<host>`: it renders signed out. Sign in with GitHub and install the App on a few repos.
 Each batch (one every 10 minutes) scans a few repos, the one scanned longest ago first, so the catalogue fills over
 the next hours, and a long history takes several batches per repo. Workers Logs (on, through `observability`) show each

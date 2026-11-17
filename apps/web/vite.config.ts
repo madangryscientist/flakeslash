@@ -3,6 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { buildCommit } from "./src/build-commit.ts";
 
 // The Playwright run keeps its local D1 apart, so it never touches dev data.
 const e2e = process.env["FLAKESLASH_E2E"] === "1";
@@ -40,7 +41,12 @@ function buildKind(command: "serve" | "build"): string {
 }
 
 export default defineConfig(({ command }) => ({
-  define: { FLAKESLASH_BUILD_KIND: JSON.stringify(buildKind(command)) },
+  // The commit is worked out here, at build time, so the Worker never runs git. `vite dev` has no build
+  // commit to name, and a build with neither git nor BUILD_COMMIT fails loudly.
+  define: {
+    FLAKESLASH_BUILD_KIND: JSON.stringify(buildKind(command)),
+    FLAKESLASH_BUILD_COMMIT: JSON.stringify(command === "build" ? buildCommit() : "dev"),
+  },
   resolve: { tsconfigPaths: true },
   plugins: [
     cloudflare({
