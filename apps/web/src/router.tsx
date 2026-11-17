@@ -6,14 +6,14 @@ import {
 import { routeTree } from "./routeTree.gen";
 
 function RouteError({ reset }: ErrorComponentProps) {
-  return <ErrorPage onRetry={reset} renderHome={(props) => <a href="/" {...props} />} />;
+  return <ErrorPage onRetry={reset} />;
 }
 
 export function getRouter() {
   return createTanStackRouter({
     routeTree,
     scrollRestoration: true,
-    defaultNotFoundComponent: () => <NotFound renderHome={(props) => <a href="/" {...props} />} />,
+    defaultNotFoundComponent: () => <NotFound />,
     defaultErrorComponent: RouteError,
   });
 }
