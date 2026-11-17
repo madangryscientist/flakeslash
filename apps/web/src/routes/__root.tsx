@@ -10,6 +10,8 @@ export const Route = createRootRoute({
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { name: "color-scheme", content: "dark" },
       { title: "FlakeSlash" },
+      // The commit this build was made from, in every page's head and nowhere on the page.
+      { name: "build-commit", content: FLAKESLASH_BUILD_COMMIT },
     ],
     links: [{ rel: "stylesheet", href: appCss }],
   }),

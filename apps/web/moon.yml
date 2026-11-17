@@ -13,6 +13,12 @@ tasks:
       runFromWorkspaceRoot: true
   build:
     command: "bun run vite build"
+    # The build names its commit in a meta tag (src/build-commit.ts). A task's own `inputs` replace the
+    # default glob, so `**/*` is listed again. `$BUILD_COMMIT` makes a build that sets it miss the cache; CI
+    # does not set it yet, so a main cache hit can still restore a dist naming an older sha.
+    inputs:
+      - "**/*"
+      - "$BUILD_COMMIT"
     # The Cloudflare plugin also writes .wrangler/deploy/config.json, the redirect that vite preview
     # and wrangler deploy read; without it a cache hit restores dist they cannot find.
     outputs:
