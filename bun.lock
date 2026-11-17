@@ -18,8 +18,8 @@
       "name": "@flakeslash/web",
       "dependencies": {
         "@hackcove/flakeslash-engine": "workspace:*",
-        "@hackcove/themes": "^0.2.3",
-        "@hackcove/ui-react": "^0.10.13",
+        "@hackcove/themes": "^0.3.1",
+        "@hackcove/ui-react": "^0.11.2",
         "@tailwindcss/vite": "^4.3.5",
         "@tanstack/react-router": "1.170.46",
         "@tanstack/react-start": "1.169.5",
@@ -187,9 +187,9 @@
 
     "@hackcove/flakeslash-engine": ["@hackcove/flakeslash-engine@workspace:packages/engine"],
 
-    "@hackcove/themes": ["@hackcove/themes@0.2.3", "", { "peerDependencies": { "tailwindcss": "^4" } }, "sha512-WFprxtjBMfCuHtjsZ4Qc6VLZuvgGAwiktnq988BRAg7EfJ9SOG3XlO2wf//1+RSli63HoSK1tV1No0UQ9XBCew=="],
+    "@hackcove/themes": ["@hackcove/themes@0.3.1", "", { "peerDependencies": { "tailwindcss": "^4" } }, "sha512-aBbshop5mr4yXJoANIJQ7dOZk2mmi+Grb05TQ0gBFTA+jApnkPfmFSYgq9iVSLmNg9KmRdFwmzG8uG7DTwz9kw=="],
 
-    "@hackcove/ui-react": ["@hackcove/ui-react@0.10.13", "", { "dependencies": { "@internationalized/date": "^3.12.4", "react-aria-components": "^1.22.1" }, "peerDependencies": { "@types/react": ">=18", "@types/react-dom": ">=18", "react": ">=18", "react-dom": ">=18", "tailwindcss": "^4" }, "optionalPeers": ["@types/react", "@types/react-dom"] }, "sha512-f+ncSTe9ZVLqp7IpX/bPxEqdrb2G3G0dp3GdhJXlyUoyXrLQf/YEOmJ93dmfquNTkEPHky0pgZuYO0LTU3Hjsw=="],
+    "@hackcove/ui-react": ["@hackcove/ui-react@0.11.2", "", { "dependencies": { "@internationalized/date": "^3.12.4", "react-aria-components": "^1.22.1" }, "peerDependencies": { "@types/react": ">=18", "@types/react-dom": ">=18", "react": ">=19", "react-dom": ">=19", "tailwindcss": "^4" }, "optionalPeers": ["@types/react", "@types/react-dom"] }, "sha512-HxXNAqEhPddV8oS/gZUDzqmnYNXrqT9BZN6QGcrla0rD2K34k5oVMvWr3yyb7EVdX/y2c5BJ0bCKRH76gdPhUQ=="],
 
     "@img/colour": ["@img/colour@1.1.0", "", {}, "sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ=="],
 

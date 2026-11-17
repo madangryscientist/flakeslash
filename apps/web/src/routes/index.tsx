@@ -1,4 +1,4 @@
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useId } from "react";
 import {
   AppShell,
@@ -34,16 +34,19 @@ type Org = NonNullable<Awaited<ReturnType<typeof getCatalogue>>>[number];
 function Home() {
   const { signedIn, catalogue } = Route.useLoaderData();
   const orgs = catalogue ?? [];
+  // `empty` shows whenever the list has no children, so it is set only when signed in: signed out,
+  // the list stays blank, as it did with the old `isEmpty`.
   return (
     <AppShell>
       <ListLayout
         title="FlakeSlash"
         actions={signedIn ? <SignOut login={signedIn.login} /> : <SignIn />}
-        isEmpty={signedIn !== null && orgs.length === 0}
         empty={
-          <EmptyState title="No organisations yet">
-            <Text as="p">No organisation you can reach has installed FlakeSlash.</Text>
-          </EmptyState>
+          signedIn ? (
+            <EmptyState title="No organisations yet">
+              <Text as="span">No organisation you can reach has installed FlakeSlash.</Text>
+            </EmptyState>
+          ) : undefined
         }
       >
         {orgs.map((org) => (
@@ -61,7 +64,7 @@ function SignIn() {
 function SignOut({ login }: { login: string }) {
   return (
     <form method="post" action="/auth/sign-out">
-      <Text as="p">
+      <Text as="span">
         Signed in as {login}.{" "}
         <Button type="submit" variant="link">
           Sign out
@@ -91,16 +94,14 @@ function OrgSection({ org }: { org: Org }) {
         </Card>
       )}
       {org.unranked > 0 && (
-        <Text as="p" color="muted">
+        <Text as="span" tone="muted">
           {unrankedText(org.unranked)}
         </Text>
       )}
       {showDismissed && org.dismissed.length > 0 && <Dismissed issues={org.dismissed} />}
       {org.dismissed.length > 0 && (
-        <Text as="p">
-          <TextLink
-            render={(p) => <Link to="/" search={showDismissed ? {} : { dismissed: 1 }} {...p} />}
-          >
+        <Text as="span">
+          <TextLink href={showDismissed ? "/" : "/?dismissed=1"}>
             {showDismissed ? "Hide dismissed" : `Show dismissed (${org.dismissed.length})`}
           </TextLink>
         </Text>
@@ -117,10 +118,13 @@ function reposText(repos: string[]): string {
 function CandidateRow({ entry, divided }: { entry: CatalogueEntry; divided: boolean }) {
   return (
     <ListRow
-      static
       divided={divided}
-      leading={<Text numeric>{entry.rank}</Text>}
-      trailing={entry.flaky ? <Pill tone="red">Flaky</Pill> : <Pill tone="amber">Suspect</Pill>}
+      leading={
+        <Text as="span" numeric>
+          {entry.rank}
+        </Text>
+      }
+      trailing={entry.flaky ? <Pill tone="danger">Flaky</Pill> : <Pill tone="warn">Suspect</Pill>}
       secondary={
         <MetaList>
           <span>
@@ -146,7 +150,7 @@ function Dismissed({ issues }: { issues: { id: string; name: string }[] }) {
       </SectionHeading>
       <Card flush>
         {issues.map((issue, index) => (
-          <ListRow key={issue.id} static divided={index > 0}>
+          <ListRow key={issue.id} divided={index > 0}>
             {issue.name}
           </ListRow>
         ))}
