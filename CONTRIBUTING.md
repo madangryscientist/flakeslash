@@ -39,3 +39,9 @@ Lint rules are errors: fix the code, do not disable a rule.
   at the end: `fix(engine): handle an empty rule list (#12)`. The squash keeps your subject.
 - Stage files by name. Never commit straight to `main`.
 - No AI attribution trailers are required or expected.
+
+## The facts file
+
+[`FACTS.md`](FACTS.md) lists what FlakeSlash does today, what is planned, its licence and where it
+runs. A pull request that changes what the product does, where it runs or its licence updates
+`FACTS.md` in the same pull request and bumps its "Checked against" line.
