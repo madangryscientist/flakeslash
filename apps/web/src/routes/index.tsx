@@ -44,7 +44,7 @@ function Home() {
         empty={
           signedIn ? (
             <EmptyState title="No organisations yet">
-              <Text>No organisation you can reach has installed FlakeSlash.</Text>
+              <Text as="span">No organisation you can reach has installed FlakeSlash.</Text>
             </EmptyState>
           ) : undefined
         }
@@ -64,7 +64,7 @@ function SignIn() {
 function SignOut({ login }: { login: string }) {
   return (
     <form method="post" action="/auth/sign-out">
-      <Text>
+      <Text as="span">
         Signed in as {login}.{" "}
         <Button type="submit" variant="link">
           Sign out
@@ -93,10 +93,14 @@ function OrgSection({ org }: { org: Org }) {
           ))}
         </Card>
       )}
-      {org.unranked > 0 && <Text tone="muted">{unrankedText(org.unranked)}</Text>}
+      {org.unranked > 0 && (
+        <Text as="span" tone="muted">
+          {unrankedText(org.unranked)}
+        </Text>
+      )}
       {showDismissed && org.dismissed.length > 0 && <Dismissed issues={org.dismissed} />}
       {org.dismissed.length > 0 && (
-        <Text>
+        <Text as="span">
           <TextLink href={showDismissed ? "/" : "/?dismissed=1"}>
             {showDismissed ? "Hide dismissed" : `Show dismissed (${org.dismissed.length})`}
           </TextLink>
