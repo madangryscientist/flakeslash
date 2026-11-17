@@ -125,6 +125,8 @@ A deploy, a new route, a plan or billing change, and an npm publish each wait fo
   docs chore refactor test perf build ci style revert`. The squash keeps the subject.
 - Stage files by name or `git add -A`; never `git commit -am` (it drops new files).
 - No `Co-Authored-By` trailer and no AI attribution line, in a commit or a pull request.
+- A PR that changes what the product does, where it runs or its licence updates `FACTS.md` in the
+  same PR and bumps its "Checked against" line.
 
 ## Invariants
 
