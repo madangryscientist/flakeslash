@@ -26,7 +26,7 @@ groups each failure into an issue, and writes `report.html` next to the store wi
   `--model-via claude-code`, with a spending cap.
 - `flakeslash --help` lists every flag. Exit codes: 0 ok, 1 the run failed, 2 a usage error.
 
-More in [Getting started](https://github.com/madangryscientist/flakeslash/blob/main/docs/getting-started.md).
+More in [Getting started](https://github.com/slashsuite/flakeslash/blob/main/docs/getting-started.md).
 
 ## Licence
 

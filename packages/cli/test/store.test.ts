@@ -6,7 +6,7 @@ import type { Failure, Issue, JobExcerpt, JobRecord } from "@hackcove/flakeslash
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openSqliteStore, type SqliteStore } from "../src/store.ts";
 
-const REPO = "madangryscientist/pixelslash";
+const REPO = "slashsuite/pixelslash";
 const OTHER = "madangryscientist/other";
 
 function job(overrides: Partial<JobRecord> = {}): JobRecord {
@@ -15,7 +15,7 @@ function job(overrides: Partial<JobRecord> = {}): JobRecord {
     workflow: "CI",
     jobName: "test",
     jobId: 1,
-    url: "https://github.com/madangryscientist/pixelslash/actions/runs/10/job/1",
+    url: "https://github.com/slashsuite/pixelslash/actions/runs/10/job/1",
     commit: "865de4094426ac13811eb7cb2db5d7ccef9ed274",
     branch: "main",
     prNumber: null,
@@ -57,7 +57,7 @@ const issue = (id: string): Issue => ({
 const kept = (overrides: Partial<JobExcerpt> = {}): JobExcerpt => ({
   repo: REPO,
   jobId: 1,
-  url: "https://github.com/madangryscientist/pixelslash/actions/runs/10/job/1",
+  url: "https://github.com/slashsuite/pixelslash/actions/runs/10/job/1",
   status: "kept",
   excerpt: "Error: expected 1 to be 2",
   ...overrides,

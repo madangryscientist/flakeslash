@@ -21,7 +21,7 @@ uses a token. These are the maintainer's steps, in order:
 3. Run the `Publish` workflow from `main` with `dry_run` on. Read the packed file list in the log.
 4. Run it again with `dry_run` off. Check `npm view @hackcove/flakeslash`.
 5. On npmjs.com, add a trusted publisher to the package: GitHub Actions, repository
-   `madangryscientist/flakeslash`, workflow `publish.yml`, environment `npm-publish`.
+   `slashsuite/flakeslash`, workflow `publish.yml`, environment `npm-publish`.
 6. Delete the `NPM_TOKEN` secret from the environment, and revoke the token on npmjs.com.
 7. Tag the release and push the tag: `git tag flakeslash@0.1.0 <the published commit>` and
    `git push origin flakeslash@0.1.0`.

@@ -9,7 +9,7 @@ import {
   type JobRecord,
 } from "../src/index.ts";
 
-const REPO = "madangryscientist/pixelslash";
+const REPO = "slashsuite/pixelslash";
 const FAIL_SHA = "1111111111111111111111111111111111111111";
 const NEXT_SHA = "2222222222222222222222222222222222222222";
 const BRANCH = "feature/upload";
@@ -20,7 +20,7 @@ function record(overrides: Partial<JobRecord> = {}): JobRecord {
     workflow: "CI",
     jobName: "E2E",
     jobId: 10,
-    url: "https://github.com/madangryscientist/pixelslash/actions/runs/1/job/10",
+    url: "https://github.com/slashsuite/pixelslash/actions/runs/1/job/10",
     commit: FAIL_SHA,
     branch: BRANCH,
     prNumber: null,

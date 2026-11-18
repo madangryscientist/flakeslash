@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { signatures } from "../src/index.ts";
 
-const JOB = { repo: "madangryscientist/flakeslash", workflow: "ci", jobName: "gate" };
+const JOB = { repo: "slashsuite/flakeslash", workflow: "ci", jobName: "gate" };
 
 /** One line of a moon task's output: the target, right-aligned, then ` | ` and the line it printed. */
 function moon(target: string, text: string, width = 22): string {

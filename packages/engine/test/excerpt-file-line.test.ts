@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cutLog, signatures } from "../src/index.ts";
 
-const JOB = { repo: "madangryscientist/flakeslash", workflow: "ci", jobName: "gate" };
+const JOB = { repo: "slashsuite/flakeslash", workflow: "ci", jobName: "gate" };
 
 /** Moon's right-aligned `<target> | ` prefix on a task line. */
 const moonPrefix = (target: string) => `${target.padStart(20)} | `;

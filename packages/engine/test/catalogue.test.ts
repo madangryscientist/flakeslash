@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { place, type Issue } from "../src/catalogue.ts";
 
 const JOB = {
-  repo: "madangryscientist/pixelslash",
+  repo: "slashsuite/pixelslash",
   workflow: "ci",
   jobName: "test",
   jobId: 1,

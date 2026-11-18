@@ -14,7 +14,7 @@
       "completed_at": "2026-11-03T16:42:31Z",
       "runner_name": "GitHub Actions 1000001064",
       "labels": ["ubuntu-latest"],
-      "html_url": "https://github.com/madangryscientist/pixelslash/actions/runs/41676366416/job/126057955448",
+      "html_url": "https://github.com/slashsuite/pixelslash/actions/runs/41676366416/job/126057955448",
       "steps": [
         {
           "name": "Set up job",
@@ -87,7 +87,7 @@
       "completed_at": "2026-11-03T16:41:37Z",
       "runner_name": "GitHub Actions 1000001065",
       "labels": ["ubuntu-latest"],
-      "html_url": "https://github.com/madangryscientist/pixelslash/actions/runs/41676366416/job/126057956029",
+      "html_url": "https://github.com/slashsuite/pixelslash/actions/runs/41676366416/job/126057956029",
       "steps": [
         {
           "name": "Set up job",
@@ -148,7 +148,7 @@
       "completed_at": "2026-11-03T16:39:16Z",
       "runner_name": "GitHub Actions 1000001066",
       "labels": ["ubuntu-latest"],
-      "html_url": "https://github.com/madangryscientist/pixelslash/actions/runs/41676366416/job/126057956281",
+      "html_url": "https://github.com/slashsuite/pixelslash/actions/runs/41676366416/job/126057956281",
       "steps": [
         {
           "name": "Set up job",
@@ -185,7 +185,7 @@
       "completed_at": "2026-11-03T16:47:44Z",
       "runner_name": "GitHub Actions 1000001067",
       "labels": ["ubuntu-latest"],
-      "html_url": "https://github.com/madangryscientist/pixelslash/actions/runs/41676366416/job/126058067053",
+      "html_url": "https://github.com/slashsuite/pixelslash/actions/runs/41676366416/job/126058067053",
       "steps": [
         {
           "name": "Set up job",

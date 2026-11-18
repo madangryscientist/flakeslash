@@ -10,7 +10,7 @@
   "license": "Elastic-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/madangryscientist/flakeslash.git",
+    "url": "git+https://github.com/slashsuite/flakeslash.git",
     "directory": "packages/cli"
   },
   "bin": {

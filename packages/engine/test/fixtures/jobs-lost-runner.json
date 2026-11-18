@@ -14,7 +14,7 @@
       "completed_at": "2026-11-05T10:12:40Z",
       "runner_name": "GitHub Actions 1000009001",
       "labels": ["ubuntu-latest"],
-      "html_url": "https://github.com/madangryscientist/pixelslash/actions/runs/42200000000/job/130000000001",
+      "html_url": "https://github.com/slashsuite/pixelslash/actions/runs/42200000000/job/130000000001",
       "steps": [
         {
           "name": "Set up job",
