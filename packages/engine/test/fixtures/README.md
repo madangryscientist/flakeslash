@@ -1,6 +1,6 @@
 # Fixtures for the GitHub Actions reader
 
-Recorded with `gh api` from `madangryscientist/pixelslash` and trimmed to the fields the reader
+Recorded with `gh api` from `slashsuite/pixelslash` and trimmed to the fields the reader
 uses (real field names, real values):
 
 - `runs-41676366416.json`: the run. `run_attempt` 3, `conclusion` `success`, `pull_requests` empty.

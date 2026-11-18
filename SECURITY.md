@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Report it privately, not in a public issue: use GitHub's private vulnerability reporting,
-**Security > Report a vulnerability** on the repository (https://github.com/madangryscientist/flakeslash).
+**Security > Report a vulnerability** on the repository (https://github.com/slashsuite/flakeslash).
 If you cannot use GitHub, email hello@hack-cove.com. Only the maintainers can read the report. Say
 what you found, the version or commit, and the steps to reproduce it; a proof of concept helps.
 

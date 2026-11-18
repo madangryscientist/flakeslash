@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import type { FetchLike } from "../src/index.ts";
 
 export const API = "https://api.github.com";
-export const REPO = "madangryscientist/pixelslash";
+export const REPO = "slashsuite/pixelslash";
 export const SHA = "865de4094426ac13811eb7cb2db5d7ccef9ed274";
 
 export interface RunsFixture {

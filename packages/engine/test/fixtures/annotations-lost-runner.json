@@ -9,7 +9,7 @@
     "title": "",
     "message": "The runner has received a shutdown signal. This can happen when the runner service is stopped, or a manually started runner is canceled.",
     "raw_details": "",
-    "blob_href": "https://github.com/madangryscientist/pixelslash/blob/0123456789abcdef0123456789abcdef01234567/.github"
+    "blob_href": "https://github.com/slashsuite/pixelslash/blob/0123456789abcdef0123456789abcdef01234567/.github"
   },
   {
     "path": ".github",
@@ -21,6 +21,6 @@
     "title": "",
     "message": "The operation was canceled.",
     "raw_details": "",
-    "blob_href": "https://github.com/madangryscientist/pixelslash/blob/0123456789abcdef0123456789abcdef01234567/.github"
+    "blob_href": "https://github.com/slashsuite/pixelslash/blob/0123456789abcdef0123456789abcdef01234567/.github"
   }
 ]

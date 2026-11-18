@@ -6,7 +6,7 @@ import { testDb } from "./test-db.ts";
 
 export const ACME = 101;
 export const GLOBEX = 202;
-export const REPO = "madangryscientist/pixelslash";
+export const REPO = "slashsuite/pixelslash";
 export const OTHER = "madangryscientist/other";
 
 export function job(overrides: Partial<JobRecord> = {}): JobRecord {
@@ -15,7 +15,7 @@ export function job(overrides: Partial<JobRecord> = {}): JobRecord {
     workflow: "CI",
     jobName: "test",
     jobId: 1,
-    url: "https://github.com/madangryscientist/pixelslash/actions/runs/10/job/1",
+    url: "https://github.com/slashsuite/pixelslash/actions/runs/10/job/1",
     commit: "865de4094426ac13811eb7cb2db5d7ccef9ed274",
     branch: "main",
     prNumber: null,
@@ -46,7 +46,7 @@ export const issue = (id: string): Issue => ({
 export const kept = (overrides: Partial<JobExcerpt> = {}): JobExcerpt => ({
   repo: REPO,
   jobId: 1,
-  url: "https://github.com/madangryscientist/pixelslash/actions/runs/10/job/1",
+  url: "https://github.com/slashsuite/pixelslash/actions/runs/10/job/1",
   status: "kept",
   excerpt: "Error: expected 1 to be 2",
   ...overrides,

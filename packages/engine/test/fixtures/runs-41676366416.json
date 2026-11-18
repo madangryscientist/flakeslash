@@ -14,9 +14,9 @@
       "created_at": "2026-11-03T16:39:04Z",
       "run_started_at": "2026-11-03T16:58:59Z",
       "pull_requests": [],
-      "previous_attempt_url": "https://api.github.com/repos/madangryscientist/pixelslash/actions/runs/41676366416/attempts/2",
+      "previous_attempt_url": "https://api.github.com/repos/slashsuite/pixelslash/actions/runs/41676366416/attempts/2",
       "repository": {
-        "full_name": "madangryscientist/pixelslash"
+        "full_name": "slashsuite/pixelslash"
       }
     }
   ]

@@ -93,7 +93,7 @@ describe("flakeslash scan: the second scan", () => {
 
   it("treats Owner/Repo and owner/repo as one repo", async () => {
     const gh = fakeGitHub(realRoutesWithLogs());
-    await scan.exec(["scan", "Madangryscientist/PixelSlash", "--since", SINCE], gh);
+    await scan.exec(["scan", "Slashsuite/PixelSlash", "--since", SINCE], gh);
     const before = await scan.rows();
     expect(before).toHaveLength(12);
 

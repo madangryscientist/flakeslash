@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { signatures } from "../src/index.ts";
 
-const JOB = { repo: "madangryscientist/pixelslash", workflow: "ci", jobName: "e2e" };
+const JOB = { repo: "slashsuite/pixelslash", workflow: "ci", jobName: "e2e" };
 
 function fixture(id: string): string {
   return readFileSync(new URL(`./fixtures/logs/${id}.log`, import.meta.url), "utf8").replace(
