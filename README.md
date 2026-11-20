@@ -2,6 +2,8 @@
 
 Source-available flaky-test detection you can run yourself, under the Elastic License 2.0.
 
+Every feature, with where it lives in the source: [FEATURES.md](FEATURES.md).
+
 > **Status: alpha.** Changing fast. Expect breaking changes between versions. The `flakeslash` CLI scans GitHub Actions history on your machine, and the dashboard at https://flakeslash.slashslash.build scans the repos its GitHub App is installed on; upload is not built yet.
 
 ## Layout
