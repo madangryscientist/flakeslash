@@ -43,7 +43,7 @@ reproducible, and it stays safe to rerun or swap the model.
 - A **flake** passed and failed on the same commit, through a test retry, a CI re-run or a second run.
   The job that failed and passed is always the record, because that is what pass and fail prove. It
   names the tests it can, from the log, and from JUnit once that reader exists. A model's name for a test
-  is a label for people to read, never counted. A retry inside one passing job is a test flake, seen only
+  is a label for people to read, never counted. A retry inside one passing job is a flake too, seen only
   through JUnit, since passing jobs' logs are not read.
 - A **suspect** matches a looser pattern, such as a test that fails on a PR and passes after an
   unrelated change. It is shown, and it never counts in the flake rate.
@@ -89,7 +89,7 @@ hits three repos is one issue.
     between them, and the run left the window or the repo left the installation before the scan
     came back) is dated by its jobs' earliest start, or end where none started; one with no time on
     any job is kept.
-  - Before its rows go, each proven job flake with evidence in an expiring run gets a **flake
+  - Before its rows go, each proven flake with evidence in an expiring run gets a **flake
     record**: the repo, workflow, job and commit, the day of its earliest failed run, links to its
     earliest failed and earliest passed jobs, the issues of its failures, and the failed job's
     provider and runner. It is written while both of its runs are still held, whichever expires first.

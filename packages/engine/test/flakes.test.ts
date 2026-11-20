@@ -189,7 +189,7 @@ describe("findJobFlakes", () => {
     expect(records).toEqual(before);
   });
 
-  it("keeps a job flake's kind and starts it with no tests", () => {
+  it("keeps a flake's kind and starts it with no tests", () => {
     const [flake] = findJobFlakes([
       job({ runId: 1, conclusion: "failure" }),
       job({ runId: 2, conclusion: "success" }),
@@ -266,7 +266,7 @@ const flakyJob = [
 ];
 
 describe("nameFlakeTests", () => {
-  it("names a job flake's test from the log, with source log, when its failure prints a test location", () => {
+  it("names a flake's test from the log, with source log, when its failure prints a test location", () => {
     const flakes = findJobFlakes(flakyJob);
     const named = nameFlakeTests(
       flakes,

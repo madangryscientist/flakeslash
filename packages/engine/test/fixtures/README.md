@@ -32,5 +32,5 @@ committed file is the excerpt the engine would keep. Each is 1 KB to 17 KB.
   signature.
 
 The tests in `excerpt.test.ts` wrap each fixture in generated passing steps and cut that whole log. A
-fixture is already an excerpt, so these tests cannot show the rule on a full raw log: the planner runs
+fixture is already an excerpt, so these tests cannot show the rule on a full raw log: a maintainer runs
 `cleanLog` and `cutLog` on the seven raw logs at the gate.
