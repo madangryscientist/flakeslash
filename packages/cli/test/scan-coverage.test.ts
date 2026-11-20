@@ -131,11 +131,11 @@ describe("flakeslash scan: runs that list no jobs", () => {
   });
 
   it("counts a re-run in progress as running only, whatever its finished attempt 1 listed", async () => {
-    const rerun = {
+    const secondAttempt = {
       run: run(1, CREATED, { run_attempt: 2, status: "in_progress", conclusion: null }),
       routes: { [pullsPath(shaOf(1))]: json([]), [jobsPath(1, 1)]: jobsOf() },
     };
-    const gh = fakeGitHub(repoOf(rerun));
+    const gh = fakeGitHub(repoOf(secondAttempt));
     const first = await scan.exec(["scan", REPO, "--since", SINCE, "--json"], gh);
     expect(JSON.parse(first.out).repos[0].coverage).toEqual({
       read: 0,
@@ -188,11 +188,11 @@ describe("flakeslash scan: runs that list no jobs", () => {
   });
 
   it("does not call a run empty when a cut listing never reached it", async () => {
-    const rerun = {
+    const secondAttempt = {
       run: run(1, CREATED, { run_attempt: 2, status: "in_progress", conclusion: null }),
       routes: { [pullsPath(shaOf(1))]: json([]), [jobsPath(1, 1)]: jobsOf() },
     };
-    const routes = repoOf(rerun);
+    const routes = repoOf(secondAttempt);
     const gh = fakeGitHub(routes);
     await scan.exec(["scan", REPO, "--since", SINCE], gh);
 
@@ -205,13 +205,13 @@ describe("flakeslash scan: runs that list no jobs", () => {
   });
 
   it("counts a run in progress as running even when a rate limit cuts the read", async () => {
-    const rerun = {
+    const secondAttempt = {
       run: run(1, CREATED, { run_attempt: 2, status: "in_progress", conclusion: null }),
       routes: { [pullsPath(shaOf(1))]: json({}, { status: 429 }) },
     };
     const out = await scan.exec(
       ["scan", REPO, "--since", SINCE, "--json"],
-      fakeGitHub(repoOf(rerun)),
+      fakeGitHub(repoOf(secondAttempt)),
     );
     expect(JSON.parse(out.out).repos[0]).toMatchObject({
       cutShort: true,
@@ -259,7 +259,7 @@ describe("flakeslash scan: runs that list no jobs", () => {
   });
 
   it("does not count a run as listing no jobs when a later attempt listed jobs", async () => {
-    const rerun = {
+    const secondAttempt = {
       run: run(1, CREATED, { run_attempt: 2 }),
       routes: {
         [pullsPath(shaOf(1))]: json([]),
@@ -267,7 +267,7 @@ describe("flakeslash scan: runs that list no jobs", () => {
         [jobsPath(1, 2)]: jobsOf(job(10, 1, { run_attempt: 2 })),
       },
     };
-    const gh = fakeGitHub(repoOf(rerun, emptyRun(2)));
+    const gh = fakeGitHub(repoOf(secondAttempt, emptyRun(2)));
     const out = await scan.exec(["scan", REPO, "--since", SINCE], gh);
     expect(out.out).toContain("runs in the window: 2 read, 1 listed no jobs (1 cancelled)");
   });

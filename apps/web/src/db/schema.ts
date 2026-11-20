@@ -217,7 +217,7 @@ export const sessions = sqliteTable(
 // expire 90 days after their run (`src/expire/expire.ts`); these are written from them first and stay.
 
 /**
- * One proven job flake: a job (repo, workflow and job name) that both failed and passed on one commit.
+ * One proven flake: a job (repo, workflow and job name) that both failed and passed on one commit.
  * Written when the first run of its evidence expires, while both its runs are still held.
  */
 export const flakeRecords = sqliteTable(

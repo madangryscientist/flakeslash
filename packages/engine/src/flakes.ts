@@ -1,6 +1,6 @@
 /**
  * The flake rule: from pass and fail records alone, which jobs both failed and passed on one commit. A
- * job flake is one job (repo, workflow and job name) on one commit. Its records are read from any number
+ * flake is one job (repo, workflow and job name) on one commit. Its records are read from any number
  * of runs and attempts. Then, from the failures and issues the store holds, each flake is given the tests
  * it can name. Nothing here does I/O, reads the clock, or changes its input.
  */
@@ -161,7 +161,7 @@ function testOf(failure: Failure, issue: Issue | undefined): FlakeTest | null {
 }
 
 /**
- * Gives each job flake the tests its failed attempts name. A failure counts for a flake when its job's
+ * Gives each flake the tests its failed attempts name. A failure counts for a flake when its job's
  * page is one of the flake's failed evidence. Each failure gives at most one test, and a test is listed
  * once by its source, file and name. Any `tests` the flake already has are replaced, so the same
  * failures and issues always give the same names. It returns new flakes and never adds or drops one.
